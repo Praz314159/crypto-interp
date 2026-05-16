@@ -25,7 +25,8 @@ experiments/*/runs/
 experiments/*/datasets/
 experiments/*/figures/
 
-# Reference notebook (large; treat as external material)
+# Reference material (PDFs, notebooks) — external sources, kept on disk only
+papers/
 *.ipynb
 
 # Local config
