@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-import interp
-from interp.ablate import ablate_embedding, evaluate_loss
+from crypto_interp import interp
+from crypto_interp.interp import ablate_embedding, evaluate_loss
 
 
 def rank_frequencies(W_E_values: torch.Tensor, basis: torch.Tensor, p: int):

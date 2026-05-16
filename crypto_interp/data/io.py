@@ -1,11 +1,11 @@
 """Persist datasets to disk so they can be inspected and reused.
 
 A built `Dataset` is fully determined by (task, p, frac_train, seed). We cache
-to `datasets/{task}_p{p}_ft{frac_train}_seed{seed}.pt` and load if present.
+to ``<cache_dir>/{task}_p{p}_ft{frac_train}_seed{seed}.pt`` and load if present.
 
-Usage:
-    from data import load_or_build
-    ds = load_or_build("mul", p=113, frac_train=0.3, seed=0)
+The ``cache_dir`` is supplied by the caller (typically ``<experiment>/datasets/``
+from the experiment config). For convenience there is no library-wide default
+— experiments are explicit about where their cache lives.
 """
 
 from pathlib import Path
@@ -14,16 +14,14 @@ import torch
 
 from .base import Dataset
 
-DATASETS_DIR = Path(__file__).resolve().parent.parent / "datasets"
 
-
-def cache_path(task: str, p: int, frac_train: float, seed: int) -> Path:
+def cache_path(cache_dir: Path, task: str, p: int, frac_train: float, seed: int) -> Path:
     name = f"{task}_p{p}_ft{frac_train:.3f}_seed{seed}.pt"
-    return DATASETS_DIR / name
+    return Path(cache_dir) / name
 
 
-def save(ds: Dataset, path: Path | None = None) -> Path:
-    path = path or cache_path(ds.task, ds.p, _infer_frac_train(ds), seed=0)
+def save(ds: Dataset, path: Path) -> Path:
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "p": ds.p,
@@ -45,18 +43,17 @@ def load(path: Path) -> Dataset:
     return Dataset(**payload)
 
 
-def _infer_frac_train(ds: Dataset) -> float:
-    return ds.n_train / (ds.n_train + ds.n_test)
-
-
-def load_or_build(task: str, p: int, frac_train: float = 0.3, seed: int = 0) -> Dataset:
-    path = cache_path(task, p, frac_train, seed)
+def load_or_build(
+    cache_dir: Path,
+    task: str,
+    p: int,
+    frac_train: float = 0.3,
+    seed: int = 0,
+) -> Dataset:
+    path = cache_path(cache_dir, task, p, frac_train, seed)
     if path.exists():
-        ds = load(path)
-        return ds
-    # Lazy import to avoid circular imports
-    from . import build as build_fn
-
+        return load(path)
+    from . import build as build_fn  # lazy to avoid circular import
     ds = build_fn(task=task, p=p, frac_train=frac_train, seed=seed)
     save(ds, path)
     return ds
@@ -65,7 +62,9 @@ def load_or_build(task: str, p: int, frac_train: float = 0.3, seed: int = 0) -> 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Pre-generate and save datasets.")
+    parser = argparse.ArgumentParser(description="Pre-generate and save a dataset.")
+    parser.add_argument("--cache-dir", type=Path, required=True,
+                        help="Directory to cache the dataset under.")
     parser.add_argument("--task", type=str, required=True)
     parser.add_argument("--p", type=int, default=113)
     parser.add_argument("--frac-train", type=float, default=0.3)
@@ -74,13 +73,12 @@ if __name__ == "__main__":
                         help="Regenerate even if cached file exists.")
     args = parser.parse_args()
 
-    path = cache_path(args.task, args.p, args.frac_train, args.seed)
+    path = cache_path(args.cache_dir, args.task, args.p, args.frac_train, args.seed)
     if path.exists() and not args.force:
         print(f"Already exists: {path}")
         ds = load(path)
     else:
         from . import build as build_fn
-
         ds = build_fn(task=args.task, p=args.p,
                       frac_train=args.frac_train, seed=args.seed)
         save(ds, path)

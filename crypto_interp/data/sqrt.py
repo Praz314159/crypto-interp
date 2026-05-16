@@ -7,8 +7,7 @@ Tokenization:
   - vocab_size = p + 2, n_answer_tokens = p + 1.
 """
 
-from reference import is_quadratic_residue, tonelli_shanks
-
+from ..reference import is_quadratic_residue, tonelli_shanks
 from .base import Dataset, assemble
 
 

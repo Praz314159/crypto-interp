@@ -8,7 +8,7 @@ hook-name -> tensor. The caller then reshapes to (p, p, ...) for 2D analysis.
 import einops
 import torch
 
-from data.base import Dataset
+from ..data.base import Dataset
 
 
 @torch.no_grad()

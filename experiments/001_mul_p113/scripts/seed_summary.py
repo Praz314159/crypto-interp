@@ -16,8 +16,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-import interp
-from interp.analyze_neurons import compute_per_neuron_frequency_energy
+from crypto_interp import interp
+from crypto_interp.interp import compute_per_neuron_frequency_energy
 
 
 def summarize(run_dir: Path, top_n: int = 5):

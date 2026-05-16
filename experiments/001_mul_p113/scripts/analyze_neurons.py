@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-import interp
+from crypto_interp import interp
 
 
 def matched_bigrams(k: int, n: int) -> list[tuple[int, int]]:

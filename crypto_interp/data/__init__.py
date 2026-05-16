@@ -1,7 +1,8 @@
-"""Dataset registry. Add new tasks by creating a module with a `build` fn."""
+"""Dataset registry. Add new tasks by creating a module with a ``build`` fn."""
 
 from .base import Dataset
 from . import mul, sqrt as sqrt_mod  # avoid shadowing math.sqrt elsewhere
+from .io import load_or_build, save, load, cache_path
 
 _TASKS = {
     "mul": mul.build,
@@ -19,7 +20,12 @@ def available_tasks() -> list[str]:
     return sorted(_TASKS)
 
 
-from .io import load_or_build, save, load, cache_path  # noqa: E402
-
-__all__ = ["Dataset", "build", "available_tasks",
-           "load_or_build", "save", "load", "cache_path"]
+__all__ = [
+    "Dataset",
+    "build",
+    "available_tasks",
+    "load_or_build",
+    "save",
+    "load",
+    "cache_path",
+]
