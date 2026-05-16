@@ -1,0 +1,29 @@
+\documentclass[11pt]{article}
+
+\input{preamble}
+
+\title{Mechanistic Interpretability of Cryptographic Algorithms\\
+\large Notes}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+% Each \include below pulls in a self-contained note from the content/
+% folder. Comment one out to skip it during a fast build. Each note's file
+% begins with \section{...} so it slots cleanly into the TOC.
+
+\input{content/01_mod_mul_algorithm}
+
+% Future notes go here:
+% \include{content/02_sqrt_failure}
+% \include{content/03_multi_seed}
+% \include{content/04_subgroup_structure}
+
+\bibliographystyle{plainurl}
+\bibliography{refs}
+
+\end{document}

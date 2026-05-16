@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+
+# LaTeX build output
+notes/build/
+
+# Experiment outputs — regenerable, can be large
+experiments/*/runs/
+experiments/*/datasets/
+experiments/*/figures/
+
+# Reference notebook (large; treat as external material)
+*.ipynb
+
+# Local config
+.env

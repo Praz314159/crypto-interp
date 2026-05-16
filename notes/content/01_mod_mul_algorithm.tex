@@ -1,0 +1,136 @@
+\section{Fourier multiplication on \texorpdfstring{$\Zpstar{p}$}{(Z/p)*}}
+\label{sec:mod-mul-algorithm}
+
+We trained a one-layer transformer with the architecture and hyperparameters of
+Nanda et al.\ \cite{nanda2023progress} on the task $(a, b) \mapsto a \cdot b
+\bmod p$ for $p = 113$.  The network groks.  We claim that the learned network
+implements the algorithm in Section~\ref{subsec:mul-algorithm}, an analog of
+Nanda's Fourier multiplication algorithm composed with the discrete-log
+isomorphism of Lemma~\ref{lem:dlog-iso}.
+
+\subsection{Setup}
+\label{subsec:setup}
+
+The network has one transformer block, $d_{\text{model}} = 128$, $4$ attention
+heads of dimension $d_{\text{head}} = 32$, MLP width $d_{\text{mlp}} = 512$,
+ReLU activation, no LayerNorm.  Inputs are tokenized as $[a, b, =]$; logits are
+read at position $2$.  Training: full batch, AdamW with $\eta = 10^{-3}$,
+$\lambda = 1.0$, $30\%$ of the $p^2$ pairs as the training set.  Grokking onset
+at epoch~$\approx 3500$; convergence by epoch~$\approx 5000$.
+
+\subsection{The discrete-log isomorphism}
+\label{subsec:dlog}
+
+\begin{lemma}[Discrete-log isomorphism]
+\label{lem:dlog-iso}
+Let $p$ be an odd prime and $g$ a primitive root modulo $p$.  The map
+\begin{equation}
+  \dlog_g \colon \Zpstar{p} \;\xrightarrow{\;\sim\;}\; \Zp{p-1},
+  \qquad g^{k} \longmapsto k,
+  \label{eq:dlog-iso}
+\end{equation}
+is a group isomorphism, under which multiplication on $\Zpstar{p}$ becomes
+addition on $\Zp{p-1}$:
+\begin{equation}
+  \dlog_g(a \cdot b) \;\equiv\; \dlog_g(a) + \dlog_g(b) \pmod{p-1}.
+  \label{eq:mult-to-add}
+\end{equation}
+\end{lemma}
+
+\noindent The Pontryagin dual of $\Zp{p-1}$ is the cyclic group of multiplicative
+characters $\chi_k \colon \Zp{p-1} \to \C^\times$, $\chi_k(j) = e^{2\pi i k j /
+(p-1)}$, indexed by $k \in \Zp{p-1}$.  Pulling these back through $\dlog_g$
+yields the multiplicative characters of $\Zpstar{p}$:
+\begin{equation}
+  \chi_k(a) \;=\; \exp\!\left(\tfrac{2\pi i\, k\, \dlog_g(a)}{p-1}\right),
+  \qquad
+  \chi_k(a b) = \chi_k(a)\,\chi_k(b).
+  \label{eq:mult-character}
+\end{equation}
+
+\subsection{The Fourier multiplication algorithm on \texorpdfstring{$\Zpstar{p}$}{(Z/p)*}}
+\label{subsec:mul-algorithm}
+
+We claim that the network implements the following algorithm.  Let
+$\omega_k := 2\pi k / (p-1)$ and fix a small set $\mathcal{K} \subset \{1,
+\ldots, \lfloor (p-1)/2 \rfloor\}$ of \emph{key frequencies}
+(empirically, $|\mathcal{K}| \approx 4$).
+
+\begin{enumerate}[leftmargin=2em]
+  \item \emph{Embedding.}  For each input token $a$ and each $k \in
+        \mathcal{K}$, write
+        \begin{equation}
+          \WE[\,\cdot\,, a] \;\supseteq\;
+            \cos(\omega_k\, \dlog_g a), \;
+            \sin(\omega_k\, \dlog_g a)
+          \quad\text{(as two distinct $d_{\text{model}}$-directions).}
+          \label{eq:embed-claim}
+        \end{equation}
+  \item \emph{Attention + MLP.}  Combine the embeddings of positions $0$ and
+        $1$ and apply the angle-addition identities
+        \begin{align}
+          \cos(\omega_k(\dlog_g a + \dlog_g b))
+          &= \cos(\omega_k \dlog_g a)\cos(\omega_k \dlog_g b)
+            - \sin(\omega_k \dlog_g a)\sin(\omega_k \dlog_g b),
+            \label{eq:trig-cos} \\
+          \sin(\omega_k(\dlog_g a + \dlog_g b))
+          &= \sin(\omega_k \dlog_g a)\cos(\omega_k \dlog_g b)
+            + \cos(\omega_k \dlog_g a)\sin(\omega_k \dlog_g b).
+            \label{eq:trig-sin}
+        \end{align}
+        By \eqref{eq:mult-to-add}, the left-hand sides equal
+        $\cos(\omega_k\, \dlog_g(ab))$ and $\sin(\omega_k\, \dlog_g(ab))$.
+  \item \emph{Unembed.}  For each candidate output $c$, the logit is
+        \begin{equation}
+          \mathrm{logit}(c)
+          \;\approx\;
+          \sum_{k \in \mathcal{K}}
+            \cos\!\bigl(\omega_k\, (\dlog_g(ab) - \dlog_g c)\bigr).
+          \label{eq:logit-formula}
+        \end{equation}
+        Each summand is maximized at $\dlog_g c \equiv \dlog_g(ab) \pmod{p-1}$,
+        i.e.\ at $c \equiv a b \pmod p$; constructive interference selects the
+        correct $c$.
+\end{enumerate}
+
+We refer to this as the \emph{Fourier multiplication algorithm} on $\Zpstar{p}$.
+It is Nanda's modular-addition algorithm in the log domain, applied to the
+isomorphic group $\Zp{p-1}$.
+
+\subsection{Where each step is implemented}
+\label{subsec:implementation}
+
+\begin{itemize}[leftmargin=*]
+  \item \eqref{eq:embed-claim} is realized by the embedding matrix $\WE \in
+        \R^{d_{\text{model}} \times p}$.  Empirically, projecting $\WE$ onto
+        the multiplicative character basis \eqref{eq:mult-character} concentrates
+        $\geq 97\%$ of its $\ell_2$-energy on the $2|\mathcal{K}|$ rows
+        corresponding to $\{\cos(\omega_k \cdot), \sin(\omega_k \cdot) :
+        k \in \mathcal{K}\}$.
+  \item \eqref{eq:trig-cos}--\eqref{eq:trig-sin} are realized jointly by the
+        attention layer (which copies the per-position character values to the
+        final position) and the MLP, which computes the bilinear products via
+        $\mathrm{ReLU}$ followed by $\Wout$.  Each MLP neuron's centered
+        activation on the $(a, b)$ grid is sparse in the 2D character basis,
+        concentrated on the four bigrams corresponding to a single $k \in
+        \mathcal{K}$.
+  \item \eqref{eq:logit-formula} is realized by $\WU \Wout$, whose rows are
+        well-approximated by linear combinations of $\cos(\omega_k \dlog_g c)$,
+        $\sin(\omega_k \dlog_g c)$ for the same $k \in \mathcal{K}$.
+\end{itemize}
+
+\subsection{Relation to prior work}
+\label{subsec:relation}
+
+Nanda et al.\ \cite{nanda2023progress} established this algorithm for modular
+\emph{addition} on $\Zp{p}$.  Our result is the same algorithm composed with
+the discrete-log isomorphism \eqref{eq:dlog-iso}; equivalently, it is Fourier
+multiplication on $\Zp{p-1}$ pulled back to $\Zpstar{p}$.  Gromov
+\cite{gromov2023grokking} derives an analytic closed form for the weights of a
+2-layer MLP grokking modular addition; the analogous derivation for our
+multiplicative setting amounts to the same expressions reindexed by $\dlog_g$.
+Mallinar et al.\ \cite{mallinar2024emergence} show that recursive feature
+machines learn block-circulant features for modular addition.  In our setting,
+the analogous statement is that the model's weight matrices are block-circulant
+\emph{after reindexing by $\dlog_g$}; we leave the explicit check of this
+statement to future work.
