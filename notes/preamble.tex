@@ -8,10 +8,26 @@
 \usepackage{amsmath, amssymb, amsthm, mathtools}
 \usepackage{bm}
 \usepackage{graphicx}
+% Pull figures live from the experiment directory so the note stays in sync
+% with re-runs. The trailing `figures/` keeps room for hand-drawn diagrams
+% checked into the note itself.
+\graphicspath{%
+  {../experiments/001_mul_p113/runs/mul_baseline/}%
+  {../experiments/001_mul_p113/figures/}%
+  {../experiments/003_dmodel_sweep_p113/runs/dmodel_24/}%
+  {../experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1/}%
+  {../experiments/003_dmodel_sweep_p113/figures/}%
+  {../experiments/003_dmodel_sweep_p113/figures/basis_dynamics/}%
+  {figures/}%
+}
+% Keep figures inside their section: \FloatBarrier at the start of each
+% (sub)section prevents floats from spilling past their anchor point.
+\usepackage{placeins}
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{cleveref}
 \usepackage{enumitem}
+\usepackage{capt-of}
 
 \hypersetup{
   colorlinks=true,

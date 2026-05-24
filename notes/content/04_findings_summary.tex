@@ -1,0 +1,197 @@
+\section{Consolidated findings}
+\label{sec:findings}
+
+This note summarizes the empirical findings accumulated across the
+experiments in \texttt{experiments/001\_mul\_p113} and
+\texttt{experiments/003\_dmodel\_sweep\_p113}, organized as two threads:
+findings tied to the \emph{group-theoretic structure} that the model
+discovers, and findings about the \emph{training dynamics} by which it
+discovers them.
+
+The setup throughout is a one-layer transformer trained by full-batch
+AdamW on modular multiplication $f(a, b) = ab \bmod p$ at $p = 113$,
+$d_{\text{model}} = 24$, $d_{\text{mlp}} = 512$ unless otherwise stated,
+weight decay $\lambda = 1$, frac\_train $= 0.3$. Quantities reported are
+across 17 random seeds at this configuration.
+
+\subsection{Group-theoretic findings}
+\label{subsec:findings-grouptheory}
+
+\begin{enumerate}
+
+\item \textbf{Discrete-log isomorphism is discovered.} The embedding $\WE$
+  converges on the multiplicative Fourier basis on $\Zpstar{p}$,
+  equivalent to additive Fourier on $\Zp{p-1}$ via the discrete logarithm
+  $\dlog_g$. The model finds the natural basis given by the group's
+  character theory --- it represents elements through their characters
+  rather than through token-position one-hot encodings. The choice of
+  this basis emerges from training; no prior tells the model to use
+  characters.
+
+\item \textbf{Pontryagin duality is realized concretely.} For abelian
+  cyclic $G = \Zpstar{p}$, the character group $\widehat{G}$ is
+  isomorphic to $G$ itself, and the model's selected ``key frequencies''
+  $\mathcal K$ are a subset of $\widehat{G}$ rather than of $G$. The
+  representation of group multiplication factors through pointwise
+  product in the dual: $\chi_k(ab) = \chi_k(a) \cdot \chi_k(b)$. This is
+  Pontryagin duality realized by gradient descent.
+
+\item \textbf{$\mathcal K$ is sparse.} Across 17 seeds at $d=24$, the
+  observed $\mathcal K$ has size $3 \le |\mathcal K| \le 6$, drawn from
+  56 possible characters. Modal $|\mathcal K| = 5$. SGD finds a
+  \emph{separating} subset of $\widehat{G}$, not the full character
+  group. The 17 seeds produce 16 distinct order multisets (only the
+  multiset $[112, 112, 112]$ repeats), indicating that the basis
+  selection is genuinely combinatorial: many feasible $\mathcal K$'s
+  realize the algorithm, and which one is chosen depends on
+  initialization and dynamics.
+
+\item \textbf{Legendre encoding is structurally minimal.} The order-2
+  character $\chi$ on $\Zpstar{p}$ (the Legendre symbol) has the unique
+  feature among characters that its imaginary part vanishes identically:
+  $\chi(x) \in \{-1, +1\}$. Accordingly its embedding occupies only one
+  $d_{\text{model}}$ dimension rather than two (no sine partner). This
+  is consistent across all observed Legendre-containing $\mathcal K$'s:
+  the model exploits the representation theory's prediction without
+  being told. The minimal-encoding observation is the subject of
+  \cref{sec:legendre-channel}.
+
+\item \textbf{CRT factorization sets a complexity floor.} Since $p-1 =
+  112 = 16 \times 7$ with $\gcd(16, 7) = 1$, by CRT $\Zp{p-1} \cong
+  \Zp{16} \times \Zp{7}$. The character group factors correspondingly,
+  and any separating $\mathcal K$ must contain at least one character
+  with order divisible by 16 and at least one with order divisible by 7.
+  The cheapest such pair has orders $(16, 7)$, giving an
+  $d_{\text{mlp}}$-cost lower bound of $16 + 7 = 23$. The choice of
+  primitive characters ($\ord(k) = 112$) by SGD is consistent with this
+  bound --- one primitive covers both CRT factors at once. The
+  empirical $d_{\text{mlp}}$-cost across seeds (88 to 448) is
+  always well above the floor.
+
+\item \textbf{The basis-cost Pareto frontier maps the feasible algorithm
+  space.} For each order multiset $M$ (a tuple of character orders
+  drawn from divisors of $p-1$, $|M| = |\mathcal K|$) we can compute
+  three derived quantities purely combinatorially: the
+  $d_{\text{model}}$-cost $2|M| - \mathbf{1}[2 \in M]$, the
+  $d_{\text{mlp}}$-cost $\sum_{o \in M} o$, and the maximum
+  worst-case logit gap $\Delta_{\min}(M)$ achievable across all bases
+  realizing $M$. Enumerating $|M| \in \{3, \ldots, 7\}$ gives 8{,}668
+  feasible multisets at $p=113$, of which 5{,}803 satisfy
+  $\Delta_{\min} > 0.5$. Their projection into the
+  $(d_{\text{mlp}}\text{-cost}, \Delta_{\min})$ plane has a non-trivial
+  Pareto frontier: a 24-step boundary tracing the maximum achievable
+  gap at each cost. This frontier is a concrete combinatorial object
+  bounding what is achievable for \emph{any} algorithm of this
+  Fourier-character form, independent of training dynamics. All 17
+  observed seeds sit \emph{below} the frontier --- SGD does not find
+  Pareto-optimal bases, only feasible ones. The CRT bound of point (5)
+  is one limit point on this frontier (its bottom-left corner). The
+  diversity of seed multisets (16 distinct out of 17) reflects the rich
+  interior of the feasible region.
+
+\end{enumerate}
+
+\subsection{Dynamics findings}
+\label{subsec:findings-dynamics}
+
+\begin{enumerate}
+
+\item \textbf{Two-time-scale dynamics.} Basis commitment and magnitude
+  growth are temporally decoupled. We define the \emph{bifurcation step}
+  $t_{\text{bif}}$ as the first step at which
+  $\mathbb{E}_{k \in \mathcal K}\|P_k \WE\|^2 \big/
+  \mathbb{E}_{k \notin \mathcal K}\|P_k \WE\|^2$
+  exceeds 1.5 times its value at initialization. Across 17 seeds,
+  $t_{\text{bif}}$ has median 186 with range 134--275. The
+  \emph{cliff time} $t_{\text{cliff}}$ at which test loss drops below
+  $10^{-1}$ has median around $5{,}000$ with range 1{,}948--24{,}107.
+  Basis identity is selected $\gtrsim 100\times$ before magnitude
+  reaches generalization threshold.
+
+\item \textbf{Joint commitment via attn$\circ$MLP.} Decomposing
+  $\nabla_{\WE} \mathcal L$ along the four backward paths through the
+  residual block (skip, skip+MLP, attn+skip, attn+MLP), we find that
+  only the composition path attn$\circ$MLP carries the
+  $\mathcal K$-discovery signal. Detaching either attention or the MLP
+  reduces the gradient's top-$|\mathcal K|$ recall to chance level
+  ($\sim 0.17$). The gradient that selects $\mathcal K$ requires the
+  full composition of attention with the nonlinearity, consistent with
+  the algorithmic fact that modular multiplication needs both
+  $(a, b)$-mixing (attention) and a nonlinear character-product step
+  (MLP).
+
+\item \textbf{Joint W\_E--(attn, MLP) co-rotation.} If $\WE$ is frozen
+  at random init while the rest of the network is trained, the model
+  fails to grok: test loss remains $\sim 10$ throughout 10{,}000 steps,
+  and the unembedding matrix $\WU$ does not develop a sparse character
+  basis (its top-$|\mathcal K|$ recall against the control-run
+  $\mathcal K$ stays $\lesssim 0.3$). Basis selection is not a property
+  of any single matrix; it is a property of the joint trajectory of
+  $(\WE, \theta_{\text{attn}}, \theta_{\text{mlp}})$ co-rotating toward a
+  self-consistent representation.
+
+\item \textbf{Cliff time is predicted by basin strength, not basin
+  timing.} Bifurcation step $t_{\text{bif}}$ is not a useful predictor
+  of cliff time (Spearman $\rho \approx 0$). What does predict cliff
+  time is the K-vs-non-K energy ratio at epoch 1{,}500:
+  \begin{equation}
+    t_{\text{cliff}}
+    \;\approx\; 4.86 \times 10^4 \cdot
+    \left(
+      \mathbb{E}_{k \in \mathcal K} \|P_k \WE\|^2 \big/
+      \mathbb{E}_{k \notin \mathcal K} \|P_k \WE\|^2
+    \right)^{-1.29},
+    \qquad \rho = -0.92
+    \label{eq:cliff-pred}
+  \end{equation}
+  across 17 seeds. \emph{When} the basin commits is universal across
+  seeds; \emph{how strongly} it commits varies, and the strength
+  predicts cliff time.
+
+\item \textbf{Capacity pressure sharpens basin selection.} At
+  $d_{\text{mlp}} = 64$ (a factor of 8 below the default), grokking is
+  faster than at $d_{\text{mlp}} = 512$: test loss reaches
+  $10^{-6.7}$ by epoch $\sim 5{,}000$ versus epochs of 7{,}000--24{,}000
+  in the default. The interpretation is that tighter capacity
+  constrains $\mathcal K$ to a smaller feasible set, eliminating
+  exploration time among many viable bases. Architecturally,
+  the d\_mlp budget forces SGD toward the left half of the
+  Pareto frontier identified in point (6): at $d_{\text{mlp}} = 64$
+  no current observed seed's multiset fits the budget, and the model
+  must find a different (smaller-cost) basis. This combination of
+  capacity pressure plus the basin-strength predictor of point (9)
+  links architectural cost directly to grokking time.
+
+\end{enumerate}
+
+\subsection{Open questions}
+\label{subsec:findings-open}
+
+\begin{itemize}
+\item Does the $\mathcal K$ chosen at $d_{\text{mlp}} = 64$ avoid
+  primitive characters in favor of CRT-paired low-order characters?
+  This would be a direct empirical observation of the CRT-floor at
+  work without any prior on character orders in the loss.
+
+\item Can subgroup-stratified curricula force the model to build
+  $\mathcal K$ incrementally along the CRT lattice (e.g., one order-16
+  character first, then add one order-7 character)? This would test
+  whether the model's representations are \emph{modular} in the algebraic
+  sense.
+
+\item Can architectural pressure or stratified curricula push observed
+  seeds onto the Pareto frontier of point (6)? The current 17 seeds all
+  sit in the interior. The d\_mlp sweep is the first test; iterative
+  pruning, capacity annealing, or curriculum may push closer.
+
+\item For groups with richer subgroup lattices (e.g., $\Zpstar{211}$ with
+  $p-1 = 2 \cdot 3 \cdot 5 \cdot 7$), does the curriculum-induced
+  $\mathcal K$-growth follow the prime factorization of the order?
+
+\item What is the corresponding picture for non-abelian groups, where
+  the irreducible representations have dimensions $> 1$? The natural
+  generalization replaces $\mathcal K \subset \widehat{G}$ with a chosen
+  set of irreducible representations, and the
+  $d_{\text{mlp}}$-cost lower bound becomes
+  $\sum_{\rho \in \mathcal K} \dim(\rho)^2$.
+\end{itemize}

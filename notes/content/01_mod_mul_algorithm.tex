@@ -18,6 +18,20 @@ read at position $2$.  Training: full batch, AdamW with $\eta = 10^{-3}$,
 $\lambda = 1.0$, $30\%$ of the $p^2$ pairs as the training set.  Grokking onset
 at epoch~$\approx 3500$; convergence by epoch~$\approx 5000$.
 
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\linewidth]{all_trajectories_colored}
+  \caption{Train (left) and test (right) cross-entropy across all $16$ seeds of
+    the sweep, colored by grokking epoch.  Every seed eventually groks:
+    $15/16$ cross the $\tau = 10^{-2}$ test-loss threshold by epoch $\sim
+    12{,}000$.  Train loss drops within a few hundred epochs (memorization)
+    while test loss stays at chance for thousands of epochs before falling
+    abruptly.  The spread of grokking times is striking: the earliest seed
+    groks by $\sim 4000$ and the latest by $\sim 13{,}000$, despite identical
+    hyperparameters and data splits.}
+  \label{fig:all-trajectories}
+\end{figure}
+
 \subsection{The discrete-log isomorphism}
 \label{subsec:dlog}
 
@@ -106,19 +120,100 @@ isomorphic group $\Zp{p-1}$.
         the multiplicative character basis \eqref{eq:mult-character} concentrates
         $\geq 97\%$ of its $\ell_2$-energy on the $2|\mathcal{K}|$ rows
         corresponding to $\{\cos(\omega_k \cdot), \sin(\omega_k \cdot) :
-        k \in \mathcal{K}\}$.
+        k \in \mathcal{K}\}$ (Figure~\ref{fig:embed-basis-energy}).
   \item \eqref{eq:trig-cos}--\eqref{eq:trig-sin} are realized jointly by the
         attention layer (which copies the per-position character values to the
         final position) and the MLP, which computes the bilinear products via
         $\mathrm{ReLU}$ followed by $\Wout$.  Each MLP neuron's centered
         activation on the $(a, b)$ grid is sparse in the 2D character basis,
         concentrated on the four bigrams corresponding to a single $k \in
-        \mathcal{K}$.
+        \mathcal{K}$ (Figure~\ref{fig:neuron-2d}).
   \item \eqref{eq:logit-formula} is realized by $\WU \Wout$, whose rows are
         well-approximated by linear combinations of $\cos(\omega_k \dlog_g c)$,
-        $\sin(\omega_k \dlog_g c)$ for the same $k \in \mathcal{K}$.
+        $\sin(\omega_k \dlog_g c)$ for the same $k \in \mathcal{K}$
+        (Figure~\ref{fig:unembed-basis-energy}).
 \end{itemize}
 
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.92\linewidth]{embedding_basis_energy}
+  \caption{Energy of the embedding matrix $\WE$ projected onto each basis
+    vector, for the additive Fourier basis on $\Zp{p}$ (top) and the
+    multiplicative character basis on $\Zpstar{p}$ (bottom).  Energy at basis
+    row $k$ is $\sum_d \lvert \langle \WE[d, \cdot], b_k \rangle \rvert^2$.
+    The additive basis is dense: no small subset of frequencies dominates.
+    The multiplicative basis is sharply sparse: a handful of $(\cos, \sin)$
+    pairs at the same key frequencies $\mathcal{K} = \{17, 18, 22, 41\}$ carry
+    almost all the energy ($\geq 97\%$ in the top $10$ basis vectors).  This
+    is the direct empirical signature of \eqref{eq:embed-claim}.}
+  \label{fig:embed-basis-energy}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\linewidth]{neuron_2d_fourier_examples}
+  \caption{Magnitude of each neuron's 2D multiplicative-Fourier coefficients
+    (centered post-ReLU activations reshaped to $(a, b)$ and projected onto
+    the basis on both axes).  Each panel shows one representative neuron
+    specialized to a key frequency $k$.  As predicted by
+    \eqref{eq:trig-cos}--\eqref{eq:trig-sin}, each neuron's energy is
+    concentrated on the four ``matched bigrams'' $(\cos k, \cos k)$,
+    $(\sin k, \sin k)$, $(\sin k, \cos k)$, $(\cos k, \sin k)$ for a single
+    $k$, and is essentially zero on all other bigrams.  This is what an MLP
+    implementing the angle-addition identity looks like in the 2D character
+    basis.}
+  \label{fig:neuron-2d}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.92\linewidth]{unembed_basis_energy}
+  \caption{Same projection as Figure~\ref{fig:embed-basis-energy} but for the
+    unembedding $\WU$.  As predicted by \eqref{eq:logit-formula}, the rows of
+    $\WU$ live in the multiplicative character basis on the \emph{same} key
+    frequencies $\mathcal{K}$ used by $\WE$: the network is reading out
+    $\cos(\omega_k\, \dlog_g c)$ and $\sin(\omega_k\, \dlog_g c)$ for each
+    candidate token $c$ and summing across $k \in \mathcal{K}$.}
+  \label{fig:unembed-basis-energy}
+\end{figure}
+
+\FloatBarrier
+\subsection{Across seeds: same algorithm, different key frequencies}
+\label{subsec:seeds}
+
+The claim in Section~\ref{subsec:mul-algorithm} concerns the \emph{form} of the
+algorithm, not the specific frequency set $\mathcal{K}$.  Across the $16$
+seeds of our sweep, the form is preserved exactly --- every seed grokks,
+every seed concentrates $\WE$ on a handful of multiplicative-basis frequencies,
+and every seed's MLP neurons specialize to those frequencies via matched
+bigrams.  What varies between seeds is \emph{which} frequencies are chosen,
+and \emph{when} the network amplifies them.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\linewidth]{trajectory_heatmap}
+  \caption{For each seed (row), the epoch at which each frequency (column)
+    was first amplified to be among that seed's top-$5$ embedding
+    frequencies.  Empty cells indicate frequencies the seed never used.  The
+    set of key frequencies $\mathcal{K}$ varies seed-to-seed; the timing of
+    their amplification varies even more, with most seeds completing their
+    frequency selection within $\sim 2000$ epochs but several outliers
+    delaying amplification of one or two frequencies until well past
+    $\geq 10{,}000$ epochs --- the same seeds that grok latest in
+    Figure~\ref{fig:all-trajectories}.}
+  \label{fig:trajectory-heatmap}
+\end{figure}
+
+The picture is that of a discrete combinatorial choice: from the
+$(p-1)/2 = 56$ candidate frequencies, each seed selects a small subset whose
+identities are seed-dependent but whose \emph{count} ($|\mathcal{K}| \approx
+4$--$5$) is remarkably stable.  Two seeds may use disjoint or only partially
+overlapping $\mathcal{K}$ and yet implement the same algorithm in the sense
+of Section~\ref{subsec:mul-algorithm}: the $\dlog_g$-isomorphism makes the
+algorithm symmetric under permuting $\mathcal{K}$, so the choice of
+frequencies is a gauge degree of freedom rather than a structural one.
+
+\FloatBarrier
 \subsection{Relation to prior work}
 \label{subsec:relation}
 

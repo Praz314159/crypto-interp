@@ -1,0 +1,405 @@
+\section{Basin geometry of grokking initializations}
+\label{sec:basin-geometry}
+
+The previous notes describe \emph{what} the trained model implements (the
+Fourier multiplication algorithm of \cref{sec:mod-mul-algorithm}) and how that
+algorithm can be implemented unusually efficiently when capacity is tight
+(\cref{sec:legendre-channel}).  Both are statements about the end state of
+training.  This note begins a third thread: \emph{which} end state is reached
+from a given initialization, and what dynamics during training determine that
+selection.
+
+Empirically we have seen that under identical hyperparameters at
+$d_{\text{model}} = 24$, different random seeds find different $\mathcal K$,
+and one seed in eight fails to grok cleanly.  We characterize the set of
+``good'' initializations and the dynamical mechanism by which they reach
+their algorithmic basins.
+
+\subsection{Setup}
+\label{subsec:bgeo-setup}
+
+We work with the architecture and training recipe of \cref{subsec:setup}: a
+one-layer transformer, no LayerNorm, ReLU MLP of width $d_{\text{mlp}}$,
+trained by AdamW on full-batch cross-entropy with weight decay $\lambda > 0$.
+The embedding matrix is $\WE \in \R^{d_{\text{model}} \times p}$; only its
+restriction $W := \WE[:, 0\!:\!p]$ to value-token columns is dynamically
+relevant for the algorithm.
+
+We approximate the optimizer by gradient flow with weight decay:
+\begin{equation}
+  \frac{\mathrm dW}{\mathrm d t} \;=\; -\nabla_W \mathcal L(W; \theta_{\text{rest}}) \;-\; \lambda W,
+  \label{eq:bgeo-gradflow}
+\end{equation}
+where $\theta_{\text{rest}}$ are the remaining weights.  The cross-entropy loss is
+\begin{equation}
+  \mathcal L \;=\; -\frac{1}{|\mathcal D_{\text{train}}|}
+    \sum_{(a, b) \in \mathcal D_{\text{train}}}
+    \log p_W(\,ab \,\big|\, a, b\,).
+  \label{eq:bgeo-loss}
+\end{equation}
+Initialization: each entry of $W$ is drawn i.i.d.\ from
+$\mathcal N(0, \sigma^2 / d_{\text{model}})$.
+
+\begin{definition}[Good, bad, and Pareto-optimal initialization]
+\label{def:bgeo-good-init}
+Fix thresholds $\tau, \tau_{\text{P}} > 0$.  An initialization
+$W^{(0)}$ is
+\emph{good} if the gradient flow converges to a $W^{(\infty)}$ whose
+recovered $\mathcal K$ satisfies $c^*(W^{(\infty)}) \cdot \Delta_{\min}(\mathcal K) \geq \tau$,
+where $c^*$ is the typical per-character amplification (defined
+in~\cref{subsec:bgeo-cgap} below).  It is \emph{Pareto-optimal} if the
+$\mathcal K$ it reaches lies on the cost-quality Pareto frontier of
+bases.  It is \emph{bad} otherwise.
+\end{definition}
+
+Empirically, $\tau \approx 10$ separates the seeds that grok to noise floor
+$\sim 10^{-7}$ from the failure modes we have catalogued.
+
+\subsection{Decomposition in Fourier coordinates}
+\label{subsec:bgeo-fourier}
+
+The multiplicative-Fourier basis on $\Z/p$ (\cref{subsec:dlog}) gives an
+orthonormal basis $\{\chi_k\}_{k=0}^{p-1}$ of $\R^p$.  We decompose the
+embedding column-wise:
+\begin{equation}
+  W \;=\; \sum_{k=0}^{p-1} v_k \,\chi_k^\top,
+  \qquad v_k := W\,\chi_k \;\in\; \R^{d_{\text{model}}}.
+  \label{eq:bgeo-fourier-decomp}
+\end{equation}
+Two quantities organize the analysis:
+\begin{enumerate}[leftmargin=*]
+  \item Per-character energy $e_k(t) := \|v_k(t)\|^2$.
+  \item Per-character direction $\hat v_k(t) := v_k(t) / \|v_k(t)\|$.
+\end{enumerate}
+At random initialization,
+\begin{equation}
+  e_k^{(0)} \;\overset{\mathrm{i.i.d.}}{\sim}\;
+  \frac{\sigma^2}{d_{\text{model}}}\cdot \chi^2_{d_{\text{model}}},
+  \qquad \mathbb{E}[e_k^{(0)}] = \sigma^2.
+  \label{eq:bgeo-init-stats}
+\end{equation}
+All characters start with the same expected energy; the seed-to-seed
+differences are $O(1/\sqrt{d_{\text{model}}})$ fluctuations.  The
+basin-selection question is how these small fluctuations interact with
+training dynamics to determine $\mathcal K$.
+
+\subsection{Gradient-flow ODE in Fourier coordinates}
+\label{subsec:bgeo-flow}
+
+Projecting \eqref{eq:bgeo-gradflow} onto the Fourier basis:
+\begin{equation}
+  \frac{\mathrm d v_k}{\mathrm d t} \;=\; -\nabla_{v_k} \mathcal L \;-\; \lambda\, v_k.
+  \label{eq:bgeo-vdot}
+\end{equation}
+Taking the inner product with $2 v_k$ gives the energy dynamics:
+\begin{equation}
+  \frac{\mathrm d e_k}{\mathrm d t} \;=\; -2\,v_k^\top \nabla_{v_k}\mathcal L \;-\; 2\lambda\, e_k.
+  \label{eq:bgeo-edot}
+\end{equation}
+The naive temptation is to linearize $\nabla_{v_k} \mathcal L$ at small
+$v_k$ (i.e., at random init) and extract per-character exponential growth
+rates.  We tried this and the prediction failed empirically: the per-character
+energies stay roughly \emph{flat} during memorization, not exponentially
+growing.  The dynamics that actually matter live at a different timescale and
+in a different regime, which we now describe.
+
+\subsection{Equivariance under \texorpdfstring{$(\Z/(p-1))^*$}{(Z/(p-1))*}}
+\label{subsec:bgeo-equivariance}
+
+The character group of $\Zp{p-1}$ carries a natural action of $(\Z/(p-1))^*$
+by index multiplication: $\chi_k \mapsto \chi_{rk}$ for $r \in (\Z/(p-1))^*$.
+This action is realized on tokens by $a \mapsto g^{r \dlog_g a}$, which
+preserves the training distribution.  The loss is therefore invariant under
+the $(\Z/(p-1))^*$-action on $\WE$, and the gradient flow is equivariant.
+
+\begin{proposition}[Order-class symmetry]
+\label{prop:bgeo-order-symmetry}
+For any two characters $k, k'$ of the same order $d \mid (p-1)$, the gradient
+flow trajectories from $(\Z/(p-1))^*$-related initializations produce
+$(\Z/(p-1))^*$-related final states.  In particular, the order multiset of
+the final $\mathcal K$ is invariant on each $(\Z/(p-1))^*$-orbit of
+initializations.
+\end{proposition}
+
+\noindent So $(\Z/(p-1))^*$ collapses 48 character indices into one orbit
+within each order class.  But this is only \emph{one} of the loss's
+symmetries, and the smaller one.  The empirically dominant symmetry is a
+different one.
+
+\subsection{The sign-symmetry of the loss}
+\label{subsec:bgeo-sign-symmetry}
+
+For any $(a, b)$, the involution
+\begin{equation}
+  \sigma : (a, b) \;\longmapsto\; (-a, -b)
+  \label{eq:bgeo-sigma}
+\end{equation}
+preserves the product: $(-a)(-b) = ab \bmod p$.  Hence $\sigma$ preserves the
+training data:
+\begin{equation}
+  (a, b) \in \mathcal D_{\text{train}} \;\iff\; (-a, -b) \in \mathcal D_{\text{train}}
+\end{equation}
+(under any sign-symmetric sampling, which our split is). The cross-entropy
+loss is therefore invariant under the action of $\sigma$ on $\WE$:
+\begin{equation}
+  \mathcal L(\sigma \cdot W; \theta_{\text{rest}}) \;=\; \mathcal L(W; \sigma \cdot \theta_{\text{rest}}).
+\end{equation}
+Gradient flow with weight decay respects this symmetry: trajectories
+beginning at $\sigma$-related initializations remain $\sigma$-related.
+
+Decompose each character by its parity under~$\sigma$.  A character
+$\chi_k$ is \emph{even} if $\chi_k(-a) = \chi_k(a)$ (equivalently,
+$\chi_k(-1) = +1$, i.e.\ the order of $\chi_k$ divides $(p-1)/2 = 56$), and
+\emph{odd} if $\chi_k(-1) = -1$ (order does not divide $56$, equivalently
+the index $k$ has a particular parity in the multiplicative basis).
+Equivalently, even characters factor through $\Z/(p-1)/\{\pm 1\} \cong
+\Z/((p-1)/2)$; odd characters do not.
+
+Even and odd characters behave very differently under sign-averaging during
+training:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Even characters} $(\chi(-1) = +1)$: gradient signals from
+        $(a,b)$ and from $(-a,-b)$ are \emph{coherent}.  They add
+        constructively.  Per-character energy receives sustained, coherent
+        amplification.
+  \item \textbf{Odd characters} $(\chi(-1) = -1)$: gradient signals from
+        $(a,b)$ and from $(-a,-b)$ are \emph{anti-coherent}.  They cancel
+        on average.  Per-character energy receives no sustained
+        amplification in early training; it changes only via the
+        higher-order interaction terms ignored in the linearized picture.
+\end{itemize}
+
+This predicts that \emph{even characters get amplified first in early
+training, and odd characters lag}.  The orders dividing $56$ for $p = 113$ are
+$\{1, 2, 4, 7, 8, 14, 16, 28, 56\}$ --- everything except $112$.  Order-$112$
+characters are precisely the odd (primitive) characters.
+
+\subsection{CRT-factor coverage}
+\label{subsec:bgeo-crt}
+
+We refine the prediction further.  Recall the CRT decomposition
+\begin{equation}
+  \Z/112 \;\cong\; \Z/16 \times \Z/7.
+\end{equation}
+Each character of $\Z/112$ acts on this decomposition.  Indexing characters
+by $k \in \{1, \ldots, 111\}$, we classify:
+\begin{itemize}[leftmargin=*]
+  \item \emph{Pure $\Z/16$-part} ($\chi_k$ trivial on the $\Z/7$ factor):
+        $k$ is a multiple of $7$.  Orders in $\{1, 2, 4, 8, 16\}$.
+  \item \emph{Pure $\Z/7$-part} ($\chi_k$ trivial on $\Z/16$): $k$ is a
+        multiple of $16$.  Orders in $\{1, 7\}$.
+  \item \emph{Mixed-factor} (active on both): everything else.  Orders in
+        $\{14, 28, 56, 112\}$.
+\end{itemize}
+
+The algorithm requires characters that together discriminate elements in
+both CRT factors.  Pure-factor characters give weaker overall gradient
+signal during memorization than mixed-factor characters, because their
+contribution to discriminating $\dlog ab \mod (p-1)$ is restricted to one
+CRT factor.
+
+\begin{remark}[Combining the two symmetries]
+\label{rem:bgeo-anchor-prediction}
+The characters that receive (a) coherent gradient signal under the
+sign-symmetry $\sigma$ \emph{and} (b) discriminate both CRT factors are
+exactly the \emph{mixed-factor even characters} --- those with order in
+$\{14, 28, 56\}$.  We predict these characters dominate the very early
+amplification dynamics and are selected first as the basin's ``anchor.''
+\end{remark}
+
+\subsection{The anchor commitment phase: empirical findings}
+\label{subsec:bgeo-anchor}
+
+We measured the rank of every character in the $W_E$ spectrum at every $50$
+epochs of training across $8$ seeds at $d_{\text{model}} = 24$.  For each
+seed we identified the \emph{anchor} = the first character to reach rank~$1$
+in the spectrum, and recorded its order.
+
+\begin{center}
+\begin{tabular}{c|c|c|c}
+  seed & anchor character & order & class \\ \hline
+  $0$ & $k = 30$ (ep $0$)   & $56$ & mixed \\
+  $1$ & $k = 4$ (ep $100$)  & $28$ & mixed \\
+  $2$ & $k = 24$ (ep $100$) & $14$ & mixed \\
+  $3$ & $k = 2$ (ep $0$)    & $56$ & mixed \\
+  $4$ & $k = 46$ (ep $100$) & $56$ & mixed \\
+  $5$ & $k = 4$ (ep $0$)    & $28$ & mixed \\
+  $6$ & $k = 40$ (ep $50$)  & $14$ & mixed \\
+  $7$ & $k = 44$ (ep $100$) & $28$ & mixed \\
+\end{tabular}
+\end{center}
+
+\textbf{All $8$ seeds anchored on a mixed-factor even character.}  The
+distribution: $3$ seeds at order $56$, $3$ at order $28$, $2$ at order $14$.
+No seed anchored on a primitive ($112$), a pure-$\Z/16$ character
+(orders $2, 4, 8, 16$), or a pure-$\Z/7$ character (order $7$).  Anchor
+commitment completed within $\leq 100$ epochs in every case --- in $3$ seeds
+the anchor was rank~$1$ already at epoch~$0$ by chance.
+
+This is consistent with \cref{rem:bgeo-anchor-prediction}.  The
+intersection of ``even'' (sign-symmetry coherence) and ``mixed-factor''
+(both CRT factors active) selects exactly the $26$ characters in orders
+$\{14, 28, 56\}$, and the basin's anchor is always one of these.
+
+\subsection{Sequential K recruitment during memorization}
+\label{subsec:bgeo-sequential}
+
+After the anchor commits, the rest of $\mathcal K$ is recruited gradually.
+Tracking per-MLP-neuron preferred frequencies on seed~$4$, we find:
+
+\begin{itemize}[leftmargin=*]
+  \item By epoch $500$ ($\sim 10\%$ of the way to the cliff), $\sim 70\%$
+        of MLP neurons already commit to the anchor character $k = 46$.
+  \item Through memorization (epochs $500$--$4500$), neurons redistribute
+        across the eventual $\mathcal K = \{9, 34, 36, 38, 46\}$.
+  \item By the cliff at epoch $\sim 4900$, the final neuron-distribution
+        proportions $\{k\!=\!9 \!: 175, k\!=\!34 \!: 107, k\!=\!38 \!: 103,
+        k\!=\!46 \!: 127, k\!=\!36 \!: 7\}$ are essentially set.
+\end{itemize}
+
+The order in which K characters are recruited respects a pattern: the anchor
+(mixed-factor even) commits first; subsequent same-order or
+sign-symmetric companions are added next; primitives are added last;
+\emph{minor} characters that take only a handful of neurons (like the
+order-$28$ character $k = 36$ above with $7$ neurons) often emerge only
+near the cliff itself.  In particular, primitive characters that appear in
+$\mathcal K$ are recruited \emph{after} the even-character anchor and
+companions, never as anchor themselves.
+
+\subsection{The cliff as shortcut decay, not basin selection}
+\label{subsec:bgeo-cliff}
+
+During memorization, the model fits the training set via a combination of:
+\begin{itemize}[leftmargin=*]
+  \item The \emph{algorithm} --- the Fourier-multiplication structure being
+        built up across $W_E$, the MLP, and $W_U$ as discussed above.
+  \item \emph{Shortcuts} --- high-amplitude features that fit individual
+        training examples but do not generalize.
+\end{itemize}
+Train loss reaches the precision floor during memorization (typically by
+epoch $\sim 2000$ in our setup); the loss is jointly minimized by both
+components.  The algorithm's contribution to logits is dominated by
+shortcuts, so test loss remains at chance.
+
+Weight decay erodes both components, but \emph{at different rates}: the
+algorithm has lower norm per training example fit (because one feature
+explains many examples efficiently), so it is eroded more slowly than the
+shortcuts.  At some critical moment, shortcut amplitudes fall below
+algorithm amplitudes in the logit calculation: test loss drops abruptly.
+This is the cliff.
+
+The cliff is therefore a \emph{revelation} of the latent algorithm, not its
+\emph{discovery}.  The K characters have been preferentially amplified
+since the anchor commitment phase; the cliff merely marks the moment when
+the algorithm becomes visible at the output.  We have verified this directly:
+projecting $W_E$, $W_U$, and the MLP onto K-relevant directions at
+mid-memorization reveals a partial algorithm that performs near chance
+(strictly better than the original model, which is worse than chance due to
+shortcut noise).
+
+\subsection{Within-basin equilibrium: the $c^* \cdot \Delta_{\min}$ relation}
+\label{subsec:bgeo-cgap}
+
+Once in the algorithmic basin, the per-character amplification equilibrates
+against weight decay.  Define
+\begin{equation}
+  c_k \;:=\; \|v_k\| \cdot \|u_k\|,
+  \qquad
+  c^* \;:=\; \operatorname{geom\,mean}\bigl(\{c_k : k \in \mathcal K\}\bigr),
+\end{equation}
+where $u_k$ is the $\mathcal K$-aligned coefficient in $\WU$.  The product
+$c_k$ measures how loudly character $k$ is broadcast into the algorithm's
+logit calculation; $c^*$ is the typical per-character amplification across
+$\mathcal K$.  The empirical finding across $8$ seeds:
+
+\begin{equation}
+  -\log\bigl(\text{test loss}\bigr)
+    \;\approx\; 0.46 \cdot c^* \cdot \Delta_{\min}(\mathcal K).
+  \label{eq:bgeo-cgap}
+\end{equation}
+
+\noindent The fit is sharp: $R^2 \approx 0.99$ over the unsaturated regime
+(test loss $\gtrsim 10^{-6}$), and the linear form is uniquely good
+compared to alternatives (e.g.\ $c^*$ alone, $\Delta_{\min}$ alone,
+$(c^*)^2 \cdot \Delta_{\min}$ all fit substantially worse).
+
+The interpretation is direct: $c^* \cdot \Delta_{\min}$ is the model's
+worst-case pre-softmax logit gap.  Cross-entropy on the worst-case
+confusable wrong answer is $\sim \exp(-c^* \Delta_{\min})$, so its log is
+$-c^* \Delta_{\min}$ up to a constant. The fitted slope of $0.46$ rather
+than $1$ reflects calibration of how $\|v_k\|\|u_k\|$ maps to actual logit
+scale through the MLP nonlinearity.
+
+\subsection{Weight decay's dual role}
+\label{subsec:bgeo-wd-dual}
+
+The empirical $\lambda$-sweep on seed~$4$ shows two distinct regimes:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{$\lambda \lesssim 0.5$ (too low):} the cliff never fires.
+        The memorization basin remains stable; weight decay is too weak to
+        erode shortcuts below the algorithm.  Test loss never drops below
+        $\sim 10^{-1}$.  This is the failure mode of seed~$5$ at the
+        default $\lambda = 1$ as well: its memorization basin is unusually
+        robust.
+  \item \textbf{$\lambda \in [0.75, 2]$ (working range):} cliff fires, model
+        groks.  Within this range, $c^*$ varies modestly with $\lambda$
+        and test loss varies with it (factor of $\sim 5\times$ across the
+        range, consistent with \eqref{eq:bgeo-cgap}).
+\end{itemize}
+
+So $\lambda$ has \emph{two} distinct roles: \emph{(i)}~destabilizing
+memorization so the cliff can fire, and \emph{(ii)}~setting the within-basin
+amplification equilibrium.  These conflict: $\lambda$ small enough to
+allow large $c^*$ may also be too small to destabilize memorization, in
+which case the model never grokks.
+
+\subsection{Implications for engineering good initializations}
+\label{subsec:bgeo-engineering}
+
+The picture above suggests that ``good initialization'' is determined less by
+fine-grained spectral features at epoch $0$ and more by which mixed-factor
+even anchor the early dynamics happen to seed the basin with.  Three things
+follow:
+
+\begin{enumerate}[leftmargin=*]
+  \item The set of accessible $\mathcal K$ is constrained by the anchor: a
+        basin seeded with anchor of order $56$ tends to recruit other
+        order-$56$ companions; a basin with order-$14$ anchor tends to
+        recruit order-$7$ companions.  Different anchors produce
+        structurally different final $\mathcal K$.
+  \item Engineering a specific final $\mathcal K$ would require steering
+        the anchor selection, which in turn requires either biasing the
+        early dynamics or using weight-space interventions that survive
+        the first few hundred epochs of training.
+  \item The Pareto-optimal $\mathcal K$ identified in
+        \cref{sec:legendre-channel} may be reachable from a specific
+        subset of mixed-factor-even-anchor initializations.  Mapping which
+        anchor leads to which Pareto-optimal $\mathcal K$ is the central
+        open question.
+\end{enumerate}
+
+\subsection{Open questions}
+\label{subsec:bgeo-open}
+
+\begin{enumerate}[leftmargin=*]
+  \item Within mixed-factor even characters, what determines which specific
+        one is selected as anchor?  The empirical anchors do not
+        correspond simply to the highest-initial-energy character of
+        that class.  Some property of the data + MLP init coupling is
+        relevant.
+  \item Does the picture extend to other primes?  The CRT structure of
+        $\Z/(p-1)$ varies with $p$.  The qualitative story (sign-symmetry
+        + CRT coverage) should generalize, but the specific anchor-class
+        orders depend on $\gcd$ structure.
+  \item Can the cliff time be predicted from the anchor-commitment time?
+        Empirically, the cliff time across our $8$ seeds varies from
+        $\sim 2{,}000$ to $\sim 25{,}000$ epochs, while anchor commitment
+        completes by epoch $\sim 100$ in every case.  What sets the
+        cliff time?
+  \item The bad-initialization region: is it geometrically characterizable
+        in $W^{(0)}$-space?  We have classified the failure modes (stuck
+        memorization, weak basin, diffuse spectrum) but do not yet know
+        which inits flow to which failure.
+\end{enumerate}

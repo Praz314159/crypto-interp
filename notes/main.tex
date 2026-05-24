@@ -16,12 +16,31 @@
 % folder. Comment one out to skip it during a fast build. Each note's file
 % begins with \section{...} so it slots cleanly into the TOC.
 
+% Background: group structure of (Z/113Z)^*. Prerequisite for the main
+% modular-multiplication note; can be read independently.
+\input{content/00_group_structure}
+
 \input{content/01_mod_mul_algorithm}
 
+% Minimal-circuit implementation of the order-2 (Legendre) character at
+% d_model=24. Builds on the algorithm note and the group-structure note.
+\input{content/02_legendre_channel}
+
+% Basin geometry / linearized dynamics in Fourier coordinates.
+\input{content/03_init_basin_structure}
+
+% Consolidated findings across experiments.
+\input{content/04_findings_summary}
+
+% Per-character neuron-cluster reconstruction with the discrete-log lens.
+\input{content/05_character_clusters}
+
+% Harmonic helpers: cross-frequency ablation effects under capacity pressure.
+\input{content/06_harmonic_helpers}
+
 % Future notes go here:
-% \include{content/02_sqrt_failure}
-% \include{content/03_multi_seed}
-% \include{content/04_subgroup_structure}
+% \include{content/07_subgroup_curriculum}
+% \include{content/08_dmlp_floor}
 
 \bibliographystyle{plainurl}
 \bibliography{refs}

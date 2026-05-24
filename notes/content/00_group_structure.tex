@@ -1,0 +1,229 @@
+\section{Group structure of \texorpdfstring{$\Zpstar{113}$}{(Z/113Z)*}}
+\label{sec:group-structure}
+
+This note collects the group-theoretic facts about $\Zpstar{p}$ for $p=113$
+that the modular-multiplication algorithm note
+(Section~\ref{sec:mod-mul-algorithm}) relies on, and clarifies the role
+played by the primitive root $g$.  The short version: $\Zpstar{113}$ is
+cyclic of order $112 = 2^4 \cdot 7$ with a rich subgroup lattice; the model's
+weights live in the character group of $\Zpstar{113}$; the primitive root
+appears nowhere in the model itself --- it is a gauge choice we make at
+\emph{analysis time} to assign integer indices to characters.
+
+\subsection{The group}
+\label{subsec:group}
+
+For prime $p$, the multiplicative group $\Zpstar{p} = \{1, 2, \ldots, p-1\}$
+under multiplication mod~$p$ is cyclic of order $p-1$ (a theorem of Gauss).
+For $p = 113$,
+\begin{equation}
+  \Zpstar{113} \;\cong\; \Z/112 \;\cong\; \Z/16 \,\times\, \Z/7,
+  \label{eq:113-crt}
+\end{equation}
+by the Chinese Remainder Theorem applied to $112 = 2^4 \cdot 7$.  The
+isomorphism sends an element $a \in \Zpstar{113}$ to its pair of residues
+$(\dlog_g a \bmod 16,\, \dlog_g a \bmod 7)$, where $g$ is any primitive root
+(defined below).
+
+The subgroups of a cyclic group of order $n$ are in bijection with the
+divisors of $n$: there is exactly one subgroup of each order $d \mid n$, and
+exactly $\varphi(d)$ elements of order \emph{exactly} $d$.  For $n = 112$:
+
+\begin{center}
+\begin{tabular}{r|cccccccccc|r}
+  order $d$        & 1 & 2 & 4 & 7 & 8 & 14 & 16 & 28 & 56 & 112 & total \\
+  \hline
+  $\varphi(d)$     & 1 & 1 & 2 & 6 & 4 & 6  & 8  & 12 & 24 & 48  & 112 \\
+\end{tabular}
+\end{center}
+
+\noindent Two subgroups deserve names because cryptography uses them:
+the order-$56$ subgroup is the set of \emph{quadratic residues} (the image
+of $a \mapsto a^2$), and the order-$28$ subgroup is the set of
+\emph{fourth-power residues}.
+
+\subsection{Primitive roots}
+\label{subsec:prim-root}
+
+\begin{definition}[Primitive root]
+\label{def:prim-root}
+An element $g \in \Zpstar{p}$ is a \emph{primitive root mod~$p$} if its
+order is $p-1$; equivalently, if $\{g^0, g^1, \ldots, g^{p-2}\} = \Zpstar{p}$.
+\end{definition}
+
+Since $\Zpstar{p}$ is cyclic of order $p-1$, primitive roots exist; the
+number of them is $\varphi(p-1)$.  For $p = 113$:
+\begin{equation}
+  \#\{\text{primitive roots mod } 113\} \;=\; \varphi(112) \;=\; 48,
+  \label{eq:num-prim-roots}
+\end{equation}
+the smallest few being $g \in \{3, 5, 6, 10, 12, 17, 19, 20, \ldots\}$.
+
+Fixing a primitive root $g$ gives the \emph{discrete-log isomorphism}
+(\Cref{lem:dlog-iso} in the main note),
+\begin{equation}
+  \dlog_g \colon \Zpstar{113} \;\xrightarrow{\;\sim\;}\; \Z/112,
+  \qquad g^{k} \longmapsto k,
+  \label{eq:dlog-recap}
+\end{equation}
+which converts multiplication on $\Zpstar{113}$ into addition on $\Z/112$.
+Without a choice of $g$, we have a group $\Zpstar{113}$ that we know is
+\emph{isomorphic} to $\Z/112$ but no canonical isomorphism.  Different
+choices of $g$ give different isomorphisms, all related by automorphisms of
+$\Z/112$.
+
+\subsection{Where \texorpdfstring{$g$}{g} is specified in the code}
+\label{subsec:where-g}
+
+The primitive root is chosen in one place in the library:
+\begin{center}
+\texttt{crypto\_interp/interp/bases.py}
+\end{center}
+The function \texttt{primitive\_root(p)} returns the \emph{smallest} primitive
+root by trial: it iterates $g = 2, 3, \ldots$ and checks that
+$g^{(p-1)/q} \not\equiv 1 \pmod p$ for every prime $q \mid p-1$ (the standard
+Lucas test).  For $p = 113$, this returns $g = 3$.
+
+\begin{verbatim}
+def primitive_root(p: int) -> int:
+    """Find the smallest primitive root g of (Z/p)*."""
+    factors = _factorize(p - 1)
+    for g in range(2, p):
+        if all(pow(g, (p - 1) // q, p) != 1 for q in factors):
+            return g
+\end{verbatim}
+
+The choice propagates through \texttt{discrete\_log\_table(p)} and
+\texttt{multiplicative\_fourier\_basis(p)} into every plot, table, and key
+frequency reported in Section~\ref{sec:mod-mul-algorithm}.  When the main
+note labels frequencies as $\mathcal K = \{17, 18, 22, 41\}$, those integer
+labels are \emph{with respect to} $g = 3$.
+
+\subsection{What role does the primitive root play in the algorithm?}
+\label{subsec:role-of-g}
+
+This is the question worth dwelling on, because the answer is partly a
+non-answer: \textbf{the model does not know about $g$, and the algorithm it
+implements does not depend on a choice of $g$.}  The primitive root is a
+labeling convention, not a computational ingredient.
+
+To see why, recall the algorithm from
+Section~\ref{subsec:mul-algorithm}.  The embedding writes
+\begin{equation}
+  \WE[\,\cdot\,, a] \;\supseteq\;
+    \cos(\omega_k\, \dlog_g a), \quad
+    \sin(\omega_k\, \dlog_g a)
+  \quad \text{for } k \in \mathcal K.
+  \label{eq:embed-recap}
+\end{equation}
+The objects $\cos(\omega_k \dlog_g \cdot)$ and $\sin(\omega_k \dlog_g \cdot)$
+are functions on $\Zpstar{113}$.  Geometrically, they are the real and
+imaginary parts of the multiplicative character
+\begin{equation}
+  \chi_k(a) \;=\; \exp\!\left(\tfrac{2\pi i k\, \dlog_g a}{p-1}\right).
+  \label{eq:char}
+\end{equation}
+The \emph{set} of characters of $\Zpstar{113}$ is canonical --- it is the
+Pontryagin dual group $\widehat{\Zpstar{113}}$, intrinsic to the group with
+no reference to any $g$.  What \emph{does} depend on $g$ is how we
+\emph{label} those characters by integers in $\Z/112$.  Pick a different
+primitive root $g'$ and you relabel the same character with a different $k$.
+
+\begin{proposition}[Relabeling under change of primitive root]
+\label{prop:relabel}
+Let $g, g'$ be primitive roots of $p$ and write $g' = g^{m}$ with
+$\gcd(m, p-1) = 1$.  Then for every $a \in \Zpstar{p}$,
+\begin{equation}
+  \dlog_{g'}(a) \;\equiv\; m^{-1} \dlog_g(a) \pmod{p-1},
+  \label{eq:relabel}
+\end{equation}
+and consequently the character $\chi_k$ defined via $g$ equals the character
+$\chi_{k \, m \bmod p-1}$ defined via $g'$.  In particular, the model's key
+frequency set $\mathcal K$ relabels to $m^{-1} \mathcal K \bmod (p-1)$.
+\end{proposition}
+
+\begin{example}
+For $p = 113$ with $g = 3$, our trained model has
+$\mathcal K = \{17, 18, 22, 41\}$.  Choosing instead $g' = 5$ gives $5 =
+3^{83}$, so $m = 83$ and $m^{-1} \equiv 27 \pmod{112}$.  The same four
+characters relabel to
+$\mathcal K = \{17 \cdot 27,\, 18 \cdot 27,\, 22 \cdot 27,\, 41 \cdot 27\}
+\bmod 112 = \{11, 38, 34, 99\}$.  The plots, the algorithm, and the model's
+weights are unchanged; only the integer indices on the basis-energy bar
+chart shift.
+\end{example}
+
+This is exactly analogous to choosing a basis for a vector space: the space
+$\Zpstar{p}$ is the canonical object; $g$ is a basis (in fact, a single
+generator) we pick to write down coordinates.  Two consequences for
+interpretation:
+
+\begin{itemize}[leftmargin=*]
+  \item \emph{Within a single run}, the labels in $\mathcal K$ are
+        well-defined once we fix $g = 3$ in our analysis code.
+  \item \emph{Across seeds}, two seeds picking different $\mathcal K$ (as in
+        Figure~\ref{fig:trajectory-heatmap}) is a structural fact about
+        which characters they chose, \emph{not} a labeling artifact ---
+        because we use the same $g = 3$ for all seeds.  No relabeling can
+        make two different character subsets agree.
+\end{itemize}
+
+\subsection{The chosen key frequencies in context}
+\label{subsec:K-in-context}
+
+The frequencies $\mathcal K = \{17, 18, 22, 41\}$ for our $g=3$ baseline run
+sit in the character lattice as follows:
+\begin{center}
+\begin{tabular}{r|cccc}
+  $k$                       & 17  & 18  & 22  & 41  \\
+  \hline
+  $\gcd(k, 112)$            & 1   & 2   & 2   & 1   \\
+  order of $\chi_k$         & 112 & 56  & 56  & 112 \\
+  in 2-Sylow ($7 \mid k$)?  & no  & no  & no  & no  \\
+  in 7-Sylow ($16 \mid k$)? & no  & no  & no  & no  \\
+\end{tabular}
+\end{center}
+
+Two empirical observations:
+
+\begin{itemize}[leftmargin=*]
+  \item \emph{All four are high-order.}  Of the 112 characters, 48 have
+        order 112 (primitive) and 24 have order 56; only these two classes
+        appear in $\mathcal K$.  Lower-order characters are perfectly valid
+        but coarser: a character of order $d$ is constant on cosets of the
+        index-$d$ subgroup and therefore distinguishes fewer output tokens.
+        Heuristically, the model needs enough resolution to recover a unique
+        $c \equiv ab \pmod p$ from a small sum of characters, and high-order
+        characters provide that resolution.
+  \item \emph{None lies in a single Sylow factor.}  Multiples of $7$ in
+        $\Z/112$ are exactly the characters that vanish on the $7$-Sylow
+        subgroup (and so factor through the $\Z/16$ quotient); multiples of
+        $16$ are dually those vanishing on the $2$-Sylow.  No element of
+        $\mathcal K$ has either form: every chosen character is non-trivial
+        on \emph{both} Sylow factors, using the full $\Z/16 \times \Z/7$
+        structure rather than collapsing to one factor.
+\end{itemize}
+
+\subsection{Looking ahead: why this prime, and what changes elsewhere}
+\label{subsec:looking-ahead}
+
+Choosing $p = 113$ buys us a non-trivial subgroup lattice (because
+$112 = 2^4 \cdot 7$ has several distinct divisors) at small enough scale
+that the lattice fits on one slide.  Two natural variants flip features of
+the lattice and are good targets for follow-up notes:
+
+\begin{itemize}[leftmargin=*]
+  \item \emph{Safe prime} $p = 2q + 1$ with $q$ prime (e.g.\ $p = 107$, so
+        $p - 1 = 2 \cdot 53$).  The character lattice collapses: subgroup
+        orders are only $\{1, 2, 53, 106\}$, and there are no order-$d$
+        characters for any other $d$.  Almost every character is primitive
+        or of order $53$; the model has essentially no structural choice in
+        $\mathcal K$.  Prediction: $|\mathcal K|$ unchanged, but $\mathcal K$
+        is drawn almost uniformly from the $52$ primitive characters with
+        no Sylow bias.
+  \item \emph{Fermat prime} $p = 2^k + 1$ (e.g.\ $p = 257$, $p - 1 = 256 =
+        2^8$).  Pure $2$-tower lattice with no odd-part structure.  Every
+        non-trivial character has order a power of $2$.  Prediction: the
+        $\mathcal K$ ``avoid the lower Sylow'' phenomenon disappears because
+        there is no second Sylow to avoid.
+\end{itemize}
