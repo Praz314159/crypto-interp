@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import sys
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +57,11 @@ def main():
                         help="Override CONFIG.device. 'auto'|'cpu'|'mps'|'cuda'.")
     parser.add_argument("--early-stop-loss", type=float, default=None)
     parser.add_argument("--early-stop-patience", type=int, default=None)
+    # Generic override (repeatable): --override key=value sets any ExperimentConfig field
+    parser.add_argument("--override", action="append", default=[], metavar="KEY=VALUE",
+                        help="Override any CONFIG field, repeatable. Type is "
+                             "coerced from the field's declared type. Example: "
+                             "--override d_model=16 --override d_mlp=128")
     # Resume
     parser.add_argument("--resume", type=str, default=None,
                         help="Resume from this checkpoint path. --num-epochs is "
@@ -74,6 +79,33 @@ def main():
     if args.device is not None: overrides["device"] = args.device
     if args.early_stop_loss is not None: overrides["early_stop_loss"] = args.early_stop_loss
     if args.early_stop_patience is not None: overrides["early_stop_patience"] = args.early_stop_patience
+
+    # Generic --override key=value (type-coerced from the dataclass field type).
+    if args.override:
+        field_types = {f.name: f.type for f in fields(cfg)}
+        for kv in args.override:
+            if "=" not in kv:
+                raise SystemExit(f"--override expects KEY=VALUE, got {kv!r}")
+            key, value = kv.split("=", 1)
+            key = key.strip()
+            if key not in field_types:
+                raise SystemExit(
+                    f"Unknown CONFIG field {key!r}. Known: {sorted(field_types)}"
+                )
+            t = field_types[key]
+            # Coerce. Dataclass field types come as strings under
+            # `from __future__ import annotations`; handle the common scalar cases.
+            t_name = t if isinstance(t, str) else getattr(t, "__name__", str(t))
+            if t_name == "int":
+                coerced = int(value)
+            elif t_name == "float":
+                coerced = float(value)
+            elif t_name == "bool":
+                coerced = value.lower() in {"1", "true", "yes", "y"}
+            else:
+                coerced = value  # str or unknown
+            overrides[key] = coerced
+
     if overrides:
         cfg = replace(cfg, **overrides)
 

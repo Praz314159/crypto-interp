@@ -63,6 +63,33 @@ def _stamp_checkpoint(cfg: ExperimentConfig, datasets_dir: Path) -> dict:
     return out
 
 
+# Fields a resume() invocation is permitted to override; everything else must
+# carry over from the loaded checkpoint so the stamp keeps describing the model
+# that is actually being trained.
+_RESUME_OVERRIDE_KEYS = (
+    "log_every", "save_every", "metrics_every",
+    "early_stop_loss", "early_stop_patience", "device",
+)
+
+
+def _stamp_resumed_checkpoint(
+    saved_cfg: dict,
+    cfg: ExperimentConfig,
+    datasets_dir: Path,
+) -> dict:
+    """Build a checkpoint stamp for resumed training.
+
+    Architecture, optimizer, and dataset fields are locked-in by the loaded
+    checkpoint (saved_cfg). Only runtime knobs may be overridden by the
+    resume invocation's cfg.
+    """
+    out = dict(saved_cfg)
+    for k in _RESUME_OVERRIDE_KEYS:
+        out[k] = getattr(cfg, k)
+    out["datasets_dir"] = str(datasets_dir)
+    return out
+
+
 def _save_checkpoint(
     run_dir: Path,
     epoch: int,
@@ -294,7 +321,7 @@ def resume(
     start = time.time()
     print(f"Resuming at epoch {start_epoch}, training {additional_epochs} more.")
 
-    cfg_stamp = _stamp_checkpoint(cfg, datasets_dir)
+    cfg_stamp = _stamp_resumed_checkpoint(saved_cfg, cfg, datasets_dir)
 
     for epoch in range(start_epoch, end_epoch):
         last_epoch_done = epoch
