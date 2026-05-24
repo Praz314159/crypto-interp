@@ -19,11 +19,26 @@ dist/
 
 # LaTeX build output
 notes/build/
+notes/*.aux
+notes/*.log
+notes/*.out
+notes/*.toc
+notes/*.pdf
+notes/*.synctex.gz
+notes/*.fls
+notes/*.fdb_latexmk
+notes/*.bbl
+notes/*.blg
 
 # Experiment outputs — regenerable, can be large
 experiments/*/runs/
 experiments/*/datasets/
 experiments/*/figures/
+experiments/*/data/
+
+# Background-task / debug logs
+*.log
+!notes/content/*.log
 
 # Reference material (PDFs, notebooks) — external sources, kept on disk only
 papers/
