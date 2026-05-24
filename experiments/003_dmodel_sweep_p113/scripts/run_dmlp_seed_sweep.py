@@ -24,21 +24,26 @@ DEFAULT_SEEDS = [1, 2, 3]
 DEFAULT_EPOCHS = 40_000
 
 
-def run_one(d_mlp: int, seed: int, epochs: int, runs_dir: Path) -> int:
-    tag = f"dmodel_{D_MODEL}_dmlp_{d_mlp}_seed{seed}"
+def run_one(d_mlp: int, seed: int, epochs: int, runs_dir: Path,
+            experiment_id: str = EXPERIMENT_ID, p: int | None = None) -> int:
+    # Prime-prefix the tag so multi-prime runs do not collide with p=113 runs.
+    prefix = f"p{p}_" if p is not None else ""
+    tag = f"{prefix}dmodel_{D_MODEL}_dmlp_{d_mlp}_seed{seed}"
     cmd = [
         sys.executable, "-u",
         str(REPO_ROOT / "scripts" / "train.py"),
-        "--experiment", EXPERIMENT_ID,
+        "--experiment", experiment_id,
         "--override", f"d_model={D_MODEL}",
         "--override", f"d_mlp={d_mlp}",
         "--seed-override", str(seed),
         "--num-epochs", str(epochs),
         "--tag", tag,
     ]
+    if p is not None:
+        cmd[cmd.index("--override"):cmd.index("--override")] = ["--override", f"p={p}"]
     log_path = runs_dir / f"{tag}.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"\n=== d_mlp={d_mlp} seed={seed} → {tag} ===")
+    print(f"\n=== d_mlp={d_mlp} seed={seed}{f' p={p}' if p else ''} → {tag} ===")
     start = time.time()
     with open(log_path, "w") as logf:
         proc = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT,
@@ -56,16 +61,20 @@ def main():
     ap.add_argument("--seeds", type=str,
                     default=",".join(map(str, DEFAULT_SEEDS)))
     ap.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS)
+    ap.add_argument("--p", type=int, default=None,
+                    help="Override the prime (multi-prime sweeps). Omit for the config default (p=113).")
+    ap.add_argument("--experiment", type=str, default=EXPERIMENT_ID,
+                    help="Experiment id whose config.py to use.")
     args = ap.parse_args()
     d_mlps = [int(s) for s in args.d_mlps.split(",")]
     seeds = [int(s) for s in args.seeds.split(",")]
 
-    runs_dir = REPO_ROOT / "experiments" / EXPERIMENT_ID / "runs"
+    runs_dir = REPO_ROOT / "experiments" / args.experiment / "runs"
     overall = time.time()
     results = []
     for m in d_mlps:
         for s in seeds:
-            rc = run_one(m, s, args.epochs, runs_dir)
+            rc = run_one(m, s, args.epochs, runs_dir, experiment_id=args.experiment, p=args.p)
             results.append((m, s, rc))
     print(f"\nSweep done in {(time.time() - overall)/60:.1f} min.")
     for m, s, rc in results:
