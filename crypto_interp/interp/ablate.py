@@ -12,8 +12,11 @@ components by:
 
 import copy
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+
+from .bases import CharIndex
 
 
 def project_back(W_E_values: torch.Tensor, basis: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -64,3 +67,56 @@ def ablate_embedding(model, basis: torch.Tensor, keep_mask: torch.Tensor):
         W_E_new = project_back(W_E_values, basis, keep_mask)
         W_E[:, :p] = W_E_new.to(W_E.dtype)
     return new_model
+
+
+def ablate_character(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex, k: int) -> torch.Tensor:
+    """Gram-Schmidt-remove character ``k`` from ``W_E_values`` (d_model, p).
+
+    Returns a new (d_model, p) double tensor with the projection onto each of
+    character k's basis rows subtracted. Equivalent to ``project_back`` with a
+    keep-mask that is the complement of character k's rows.
+    """
+    W = W_E_values.clone().double()
+    for r in ci.by_char[k]:
+        b = basis[r].double()
+        coef = W @ b
+        W = W - coef[:, None] * b[None, :]
+    return W
+
+
+@torch.no_grad()
+def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
+                         threshold: float = 0.05, loss_jump: tuple[float, float] = (0.5, 2.0)) -> dict:
+    """Per-character W_E ablation: how much does removing each character hurt?
+
+    For every character k, Gram-Schmidt-ablate it from W_E and measure the
+    test-loss increase in log10. Returns
+    ``{"per_char": {k: {energy, ablated_loss, dlog10, cls}}, "base_loss", "K"}``
+    where ``cls`` is vestigial / load-bearing / essential by ``loss_jump`` cuts,
+    and ``K`` is the set of characters with >= ``threshold`` x max W_E energy.
+    """
+    from .metrics import char_energy, order_of  # local import avoids import cycle
+
+    p = ds.p
+    W_E = model.embed.W_E
+    W_E_orig = W_E.detach().clone()
+    W_val = W_E_orig[:, :p]
+    ce = char_energy(W_val, basis, ci)
+    base = evaluate_loss(model, ds)[1]
+    base_log = np.log10(base)
+    lo, hi = loss_jump
+
+    per_char: dict[int, dict] = {}
+    for k in ci.freqs:
+        W_ab = ablate_character(W_val, basis, ci, k)
+        try:
+            W_E[:, :p] = W_ab.to(W_E.dtype)
+            test_loss = evaluate_loss(model, ds)[1]
+        finally:
+            W_E.copy_(W_E_orig)
+        dlog10 = float(np.log10(test_loss) - base_log)
+        cls = "vestigial" if dlog10 < lo else ("load-bearing" if dlog10 < hi else "essential")
+        per_char[k] = dict(energy=float(ce[k - 1]), ablated_loss=float(test_loss),
+                           dlog10=dlog10, order=order_of(k, p), cls=cls)
+    K = sorted(k for k in ci.freqs if ce[k - 1] >= threshold * ce.max())
+    return dict(per_char=per_char, base_loss=float(base), K=K)

@@ -18,6 +18,9 @@ activations are sparse in the additive basis. For modular multiplication, we
 predict sparsity in the multiplicative basis.
 """
 
+import re
+from dataclasses import dataclass
+
 import torch
 
 
@@ -154,6 +157,49 @@ def project_2d(
         "kp,lq,pq...->kl...",
         basis_x.to(tensor_pp.dtype), basis_y.to(tensor_pp.dtype), tensor_pp,
     )
+
+
+# ---------- Character indexing ----------
+
+@dataclass(frozen=True)
+class CharIndex:
+    """Canonical map from multiplicative character k to its basis rows.
+
+    Resolves the per-script ``build_basis_indexed`` / ``build_char_basis``
+    variants into one record. For the basis from ``multiplicative_fourier_basis``,
+    ``cos[k]`` is row ``2k`` and ``sin[k]`` is row ``2k+1`` (the Nyquist
+    character k=n/2 has a cos row but no sin row).
+    """
+
+    p: int
+    g: int
+    names: list[str]
+    by_char: dict[int, list[int]]   # k -> [basis row indices] (cos and sin)
+    cos: dict[int, int]             # k -> cos row index
+    sin: dict[int, int]             # k -> sin row index (absent for k = n/2)
+    freqs: list[int]                # sorted character frequencies present
+
+
+def char_index(p: int, device: str = "cpu") -> tuple[torch.Tensor, CharIndex]:
+    """Return ``(basis, CharIndex)`` for ``(Z/p)*``.
+
+    ``basis`` is the (p, p) multiplicative-Fourier basis (double precision);
+    ``CharIndex`` indexes its rows by character. Prime-parametric: frequencies
+    are read from the basis names, so this works for any prime p.
+    """
+    basis, names, g = multiplicative_fourier_basis(p, device=device)
+    by_char: dict[int, list[int]] = {}
+    cos: dict[int, int] = {}
+    sin: dict[int, int] = {}
+    for i, nm in enumerate(names):
+        m = re.match(r"mul (cos|sin) (\d+)", nm)
+        if m:
+            k = int(m.group(2))
+            by_char.setdefault(k, []).append(i)
+            (cos if m.group(1) == "cos" else sin)[k] = i
+    freqs = sorted(by_char)
+    ci = CharIndex(p=p, g=g, names=names, by_char=by_char, cos=cos, sin=sin, freqs=freqs)
+    return basis.double(), ci
 
 
 if __name__ == "__main__":

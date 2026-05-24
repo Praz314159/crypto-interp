@@ -15,6 +15,12 @@ dependencies = [
     "matplotlib",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
 exclude = ["experiments*", "scripts*", "notes*", "papers*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
