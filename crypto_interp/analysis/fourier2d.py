@@ -4,11 +4,10 @@ For each character pair (k_a, k_b), compute the energy of the MLP output at the
 bilinear basis function χ_{k_a}(a) · χ_{k_b}(b). Diagonal entries (k, k) are
 standard character products χ_k(ab); off-diagonals are cross-frequency terms.
 
-Outputs:
-  figures/basis_dynamics/fourier2d_<tag>.png
+Writes ``fourier2d_<tag>.png`` to --out-dir (default: the run dir).
 
 Usage:
-    python experiments/003_dmodel_sweep_p113/scripts/analyze_2d_fourier.py \
+    python -m crypto_interp.analysis.fourier2d \
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1 \
         --tag dmlp32_seed1
 """
@@ -22,9 +21,6 @@ import numpy as np
 import torch
 
 from crypto_interp.interp import char_index, compute_activation_grid, load_run, order_of
-
-ROOT = Path(__file__).resolve().parents[1]
-FIG_DIR = ROOT / "figures" / "basis_dynamics"
 
 
 def fourier2d_energy(f_ab, basis, ci, p):
@@ -45,8 +41,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--out-dir", default=None, help="Where to write the figure (default: run dir).")
     args = ap.parse_args()
     run_dir = Path(args.run_dir).resolve()
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else run_dir
     ck = sorted(run_dir.glob("checkpoint_*.pt"))
     print(f"Loading {ck[-1]}")
     model, ds, _ = load_run(ck[-1])
@@ -98,7 +96,7 @@ def main():
                  f"diagonal = {100*diag_total/E.sum():.1f}%, "
                  f"off-diag = {100*off_total/E.sum():.1f}%", fontsize=11)
     fig.tight_layout()
-    out = FIG_DIR / f"fourier2d_{args.tag}.png"
+    out = out_dir / f"fourier2d_{args.tag}.png"
     fig.savefig(out, dpi=130, bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved {out}")

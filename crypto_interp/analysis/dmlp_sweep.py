@@ -11,6 +11,7 @@ Outputs:
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import re
 from pathlib import Path
@@ -21,16 +22,20 @@ import torch
 
 from crypto_interp.interp import char_energy, char_index, find_cliff, order_of
 
-ROOT = Path(__file__).resolve().parents[1]
-RUNS = ROOT / "runs"
-FIG_DIR = ROOT / "figures" / "basis_dynamics"
-OUT_DIR = ROOT / "data" / "basis_dynamics"
-
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--runs-dir", required=True, help="Experiment runs/ directory to scan.")
+    ap.add_argument("--out-dir", default=None,
+                    help="Where to write csv/png (default: <runs-dir>/../figures/basis_dynamics).")
+    args = ap.parse_args()
+    runs_dir = Path(args.runs_dir).resolve()
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else runs_dir.parent / "figures" / "basis_dynamics"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     pat = re.compile(r"dmodel_24_dmlp_(\d+)_seed(\d+)$")
     runs = []
-    for d in sorted(RUNS.iterdir()):
+    for d in sorted(runs_dir.iterdir()):
         m = pat.match(d.name)
         if not m or not d.is_dir():
             continue
@@ -39,7 +44,7 @@ def main():
             runs.append((int(m.group(1)), int(m.group(2)), d, ck[-1]))
     # Baseline d_mlp=512 seeds for comparison.
     for s in (1, 2, 3):
-        d = RUNS / f"dmodel_24_seed{s}"
+        d = runs_dir / f"dmodel_24_seed{s}"
         ck = sorted(d.glob("checkpoint_*.pt"))
         if ck:
             runs.append((512, s, d, ck[-1]))
@@ -79,8 +84,7 @@ def main():
               f"{r['d_mlp_cost']:>5} {r['n_primitive']:>5} {leg:>3}   "
               f"{str(r['orders']):<28}  {r['K']}")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    csv_path = OUT_DIR / "dmlp_sweep_summary.csv"
+    csv_path = out_dir / "dmlp_sweep_summary.csv"
     with open(csv_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["d_mlp", "seed", "K", "K_size", "orders", "n_primitive",
@@ -112,8 +116,7 @@ def main():
             ax.legend(fontsize=8)
     fig.suptitle(f"d_mlp sweep summary ({len(rows)} runs)", fontsize=11)
     fig.tight_layout()
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    out = FIG_DIR / "dmlp_K_summary.png"
+    out = out_dir / "dmlp_K_summary.png"
     fig.savefig(out, dpi=130, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")

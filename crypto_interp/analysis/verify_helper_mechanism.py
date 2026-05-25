@@ -18,7 +18,7 @@
     helper story, confirmed independent of the trained model.
 
 Usage:
-    python experiments/003_dmodel_sweep_p113/scripts/verify_helper_mechanism.py
+    python -m crypto_interp.analysis.verify_helper_mechanism [--out-dir DIR]
 """
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def fit_mlp(X, y, width, steps=4000, lr=5e-2, seed=0):
     return final / y.var().item()
 
 
-def bilinear_check(n=112, primary=10, widths=(1, 2, 3, 4, 6, 8), n_seeds=4):
+def bilinear_check(n=112, primary=10, widths=(1, 2, 3, 4, 6, 8), n_seeds=4, out_dir="."):
     # full grid over the cyclic group Z_n (discrete-log indices)
     ja, jb = torch.meshgrid(torch.arange(n), torch.arange(n), indexing="ij")
     ja = ja.reshape(-1).double()
@@ -134,7 +134,7 @@ def bilinear_check(n=112, primary=10, widths=(1, 2, 3, 4, 6, 8), n_seeds=4):
     ax.set_title(fr"Approximating $\cos({primary}(\varphi_a+\varphi_b))$ with a ReLU MLP")
     ax.legend(); ax.grid(True, alpha=0.3, which="both")
     fig.tight_layout()
-    out = Path(__file__).resolve().parents[1] / "figures" / "helper_mechanism_fvu.png"
+    out = Path(out_dir) / "helper_mechanism_fvu.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=140, bbox_inches="tight")
     plt.close(fig)
@@ -172,6 +172,10 @@ def sylow_contrast(n=112, n_seeds=4, width=2):
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out-dir", default=".", help="Where to write the FVU figure.")
+    args = ap.parse_args()
     relu_fourier_check()
-    bilinear_check()
+    bilinear_check(out_dir=args.out_dir)
     sylow_contrast()

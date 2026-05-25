@@ -6,8 +6,8 @@ below the floor (the compressing-d_mlp sweep), this surfaces the runs that
 memorize but never grok -- the interesting failure cases.
 
 Usage:
-    python experiments/003_dmodel_sweep_p113/scripts/check_grokking.py
-    python experiments/003_dmodel_sweep_p113/scripts/check_grokking.py --grok-thresh 0.1
+    python -m crypto_interp.analysis.check_grokking \
+        --runs-dir experiments/003_dmodel_sweep_p113/runs
 """
 from __future__ import annotations
 
@@ -17,9 +17,6 @@ from pathlib import Path
 import torch
 
 from crypto_interp.interp import grokking_status
-
-ROOT = Path(__file__).resolve().parents[1]
-RUNS = ROOT / "runs"
 
 
 def classify(status: dict) -> str:
@@ -32,7 +29,7 @@ def classify(status: dict) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs-dir", type=str, default=str(RUNS))
+    ap.add_argument("--runs-dir", type=str, required=True, help="Experiment runs/ directory to scan.")
     ap.add_argument("--grok-thresh", type=float, default=0.1)
     ap.add_argument("--mem-thresh", type=float, default=0.1)
     args = ap.parse_args()

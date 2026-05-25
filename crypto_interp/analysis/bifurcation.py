@@ -11,6 +11,7 @@ Produces:
 """
 from __future__ import annotations
 
+import argparse
 import pickle
 import re
 from pathlib import Path
@@ -21,16 +22,23 @@ import torch
 
 from crypto_interp.interp import bifurcation_step, char_energy_batch, char_index
 
-ROOT = Path(__file__).resolve().parents[1]
-IN_DIR = ROOT / "data" / "fine_grained"
-TRAJ_FILE = ROOT / "data" / "basis_dynamics" / "trajectories.pkl"
-FIG_DIR = ROOT / "figures" / "basis_dynamics"
-
 THRESHOLD = 1.5
 
 
 def main():
-    with open(TRAJ_FILE, "rb") as f:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data-dir", required=True,
+                    help="Experiment data/ dir (contains fine_grained/ and basis_dynamics/trajectories.pkl).")
+    ap.add_argument("--out-dir", default=None,
+                    help="Where to write figures (default: <data-dir>/../figures/basis_dynamics).")
+    args = ap.parse_args()
+    data_dir = Path(args.data_dir).resolve()
+    in_dir = data_dir / "fine_grained"
+    traj_file = data_dir / "basis_dynamics" / "trajectories.pkl"
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else data_dir.parent / "figures" / "basis_dynamics"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(traj_file, "rb") as f:
         trajectories = pickle.load(f)
 
     fig_overlay, ax = plt.subplots(figsize=(11, 5.5))
@@ -39,7 +47,7 @@ def main():
     cmap = plt.cm.viridis
 
     basis = ci = None
-    fg_files = sorted(IN_DIR.glob("seed*_fine_grained.pt"))
+    fg_files = sorted(in_dir.glob("seed*_fine_grained.pt"))
     for i, fg_path in enumerate(fg_files):
         seed = int(re.match(r"seed(\d+)", fg_path.name).group(1))
         d = torch.load(fg_path, weights_only=False)
@@ -76,7 +84,7 @@ def main():
     ax.set_yscale("log"); ax.axhline(1.0, color="black", ls="--", lw=0.6, alpha=0.4)
     ax.grid(True, alpha=0.3); ax.legend(fontsize=7, ncol=2, loc="lower right")
     fig_overlay.tight_layout()
-    out1 = FIG_DIR / "bifurcation_overlay.png"
+    out1 = out_dir / "bifurcation_overlay.png"
     fig_overlay.savefig(out1, dpi=130, bbox_inches="tight"); plt.close(fig_overlay)
 
     ax_n.set_xlabel("step"); ax_n.set_ylabel("ratio(t) / ratio(0)")
@@ -85,7 +93,7 @@ def main():
     ax_n.axhline(THRESHOLD, color="red", ls="--", lw=0.7, alpha=0.5, label=f"threshold = {THRESHOLD}x")
     ax_n.grid(True, alpha=0.3); ax_n.legend(fontsize=7, ncol=2, loc="lower right")
     fig_normed.tight_layout()
-    out2 = FIG_DIR / "bifurcation_overlay_normed.png"
+    out2 = out_dir / "bifurcation_overlay_normed.png"
     fig_normed.savefig(out2, dpi=130, bbox_inches="tight"); plt.close(fig_normed)
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -96,7 +104,7 @@ def main():
     ax.set_title(f"Distribution of bifurcation step across {len(finite)} / {len(commit_steps)} seeds. "
                  f"median = {int(np.median(finite)) if finite else 'n/a'}")
     ax.grid(True, alpha=0.3); fig.tight_layout()
-    out3 = FIG_DIR / "bifurcation_summary.png"
+    out3 = out_dir / "bifurcation_summary.png"
     fig.savefig(out3, dpi=130, bbox_inches="tight"); plt.close(fig)
 
     print(f"\nCommit steps (threshold = {THRESHOLD}x init ratio):")

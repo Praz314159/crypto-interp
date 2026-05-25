@@ -12,6 +12,7 @@ Produces:
 """
 from __future__ import annotations
 
+import argparse
 import pickle
 from pathlib import Path
 
@@ -20,12 +21,6 @@ import numpy as np
 import torch
 
 from crypto_interp.interp import bifurcation_step, char_energy_batch, char_index, find_cliff, order_of
-
-ROOT = Path(__file__).resolve().parents[1]
-RUNS = ROOT / "runs"
-TRAJ_FILE = ROOT / "data" / "basis_dynamics" / "trajectories.pkl"
-FG_DIR = ROOT / "data" / "fine_grained"
-FIG_DIR = ROOT / "figures" / "basis_dynamics"
 
 KLASS_COLORS = {"primitive": "#d62728", "odd": "#2ca02c",
                 "two_power": "#9467bd", "mixed": "#7f7f7f"}
@@ -45,7 +40,21 @@ def k_class(K, p):
 
 
 def main():
-    with open(TRAJ_FILE, "rb") as f:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--runs-dir", required=True, help="Experiment runs/ directory.")
+    ap.add_argument("--data-dir", required=True,
+                    help="Experiment data/ dir (basis_dynamics/trajectories.pkl + fine_grained/).")
+    ap.add_argument("--out-dir", default=None,
+                    help="Where to write figures (default: <runs-dir>/../figures/basis_dynamics).")
+    args = ap.parse_args()
+    runs_dir = Path(args.runs_dir).resolve()
+    data_dir = Path(args.data_dir).resolve()
+    traj_file = data_dir / "basis_dynamics" / "trajectories.pkl"
+    fg_dir = data_dir / "fine_grained"
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else runs_dir.parent / "figures" / "basis_dynamics"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(traj_file, "rb") as f:
         trajectories = pickle.load(f)
 
     L = len(next(iter(trajectories.values()))["char_energy"][-1])
@@ -55,7 +64,7 @@ def main():
     rows = []
     for seed in sorted(trajectories):
         traj = trajectories[seed]
-        run_dir = RUNS / f"dmodel_24_seed{seed}"
+        run_dir = runs_dir / f"dmodel_24_seed{seed}"
         if not (run_dir / "losses.pt").exists():
             continue
         losses = torch.load(run_dir / "losses.pt", weights_only=False)
@@ -76,7 +85,7 @@ def main():
             ratio_1500 = K_mean / max(nonK_mean, 1e-12)
 
         # Bifurcation step from fine-grained per-step W_E.
-        fg = FG_DIR / f"seed{seed:02d}_fine_grained.pt"
+        fg = fg_dir / f"seed{seed:02d}_fine_grained.pt"
         bif = None
         if fg.exists():
             d = torch.load(fg, weights_only=False)
@@ -113,7 +122,7 @@ def main():
     ax.set_title(f"Test loss trajectory, all {len(rows)} seeds (color = K class)")
     ax.legend(fontsize=9, loc="lower left"); ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "test_loss_trajectories.png", dpi=130, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(out_dir / "test_loss_trajectories.png", dpi=130, bbox_inches="tight"); plt.close(fig)
 
     # --- cliff vs bifurcation ---
     valid = [r for r in rows if r["cliff"] is not None and r["bifurcation"] is not None]
@@ -127,7 +136,7 @@ def main():
     ax.set_yscale("log"); ax.set_title(f"Cliff time vs bifurcation step ({len(valid)} seeds)")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "cliff_vs_bifurcation.png", dpi=130, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(out_dir / "cliff_vs_bifurcation.png", dpi=130, bbox_inches="tight"); plt.close(fig)
 
     # --- cliff prediction from ratio@1500 ---
     valid_r = [r for r in rows if r["cliff"] and r["ratio_1500"] and r["ratio_1500"] > 0]
@@ -150,7 +159,7 @@ def main():
     ax.set_title(f"Cliff prediction. n={len(valid_r)} seeds. Spearman rho = {rho:.2f}")
     ax.legend(fontsize=10); ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "cliff_prediction_from_ratio.png", dpi=130, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(out_dir / "cliff_prediction_from_ratio.png", dpi=130, bbox_inches="tight"); plt.close(fig)
     print(f"\nRegression: cliff = {A:.1f} x ratio^{slope:.3f}   rho={rho:.3f}")
 
 

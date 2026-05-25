@@ -7,9 +7,11 @@ sparse or has a smooth tail of load-bearing characters.
 
 Uses crypto_interp.interp.essential_characters (prime-parametric).
 
-Outputs:
-  data/basis_dynamics/ablation_full_<tag>.csv
-  figures/basis_dynamics/ablation_full_<tag>.png
+Writes ``ablation_full_<tag>.{csv,png}`` to --out-dir (default: the run dir).
+
+Usage:
+    python -m crypto_interp.analysis.ablation_full \
+        --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1
 """
 from __future__ import annotations
 
@@ -22,10 +24,6 @@ import numpy as np
 
 from crypto_interp.interp import char_index, essential_characters, load_run
 
-ROOT = Path(__file__).resolve().parents[1]
-FIG_DIR = ROOT / "figures" / "basis_dynamics"
-OUT_DIR = ROOT / "data" / "basis_dynamics"
-
 ORDER_COLOR = {
     2: "#9467bd", 4: "#8c564b", 7: "#bcbd22", 8: "#17becf",
     14: "#e377c2", 16: "#1f77b4", 28: "#2ca02c", 56: "#ff7f0e", 112: "#d62728",
@@ -36,8 +34,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--out-dir", default=None, help="Where to write csv/png (default: run dir).")
     args = ap.parse_args()
     run_dir = Path(args.run_dir).resolve()
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else run_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     tag = args.tag or run_dir.name
     ck = sorted(run_dir.glob("checkpoint_*.pt"))
     print(f"Loading {ck[-1]}")
@@ -61,8 +62,7 @@ def main():
               f"{r['ablated']:>12.4e} {r['delta_log']:>+8.3f} "
               f"{'Y' if r['in_top_K'] else '.':>5}")
 
-    csv_path = OUT_DIR / f"ablation_full_{tag}.csv"
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / f"ablation_full_{tag}.csv"
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
@@ -116,8 +116,7 @@ def main():
 
     fig.suptitle(f"Full per-character ablation, baseline test loss = {base:.2e}", fontsize=11)
     fig.tight_layout()
-    out = FIG_DIR / f"ablation_full_{tag}.png"
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"ablation_full_{tag}.png"
     fig.savefig(out, dpi=130, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")
