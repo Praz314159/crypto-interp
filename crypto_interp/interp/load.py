@@ -26,12 +26,17 @@ def load_run(
     Pass it explicitly when loading a checkpoint from a non-standard location.
     """
     ckpt_path = Path(ckpt_path)
-    ckpt = torch.load(ckpt_path, weights_only=False)
+    # map_location=device lets checkpoints trained on another device (e.g. a Colab
+    # GPU) load on this machine; without it CUDA-saved tensors fail on a CPU box.
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     cfg_dict = ckpt["config"]
 
     if datasets_dir is None:
-        # Prefer datasets_dir baked into the checkpoint if present; else infer.
-        datasets_dir = cfg_dict.get("datasets_dir") or _infer_datasets_dir(ckpt_path)
+        # Prefer the datasets_dir baked into the checkpoint, but only if it still
+        # exists — checkpoints trained elsewhere (e.g. Colab) bake in a path that
+        # isn't present locally; in that case infer from the checkpoint location.
+        baked = cfg_dict.get("datasets_dir")
+        datasets_dir = baked if (baked and Path(baked).exists()) else _infer_datasets_dir(ckpt_path)
     datasets_dir = Path(datasets_dir)
 
     ds = data.load_or_build(
