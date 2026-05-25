@@ -34,6 +34,11 @@ class ExperimentConfig:
     warmup_steps: int = 10
     num_epochs: int = 50_000
 
+    # Per-step W_E logging for the first N epochs (0 disables). Captures the
+    # early basis-commitment dynamics in one pass -> run_dir/fine_grained.pt,
+    # instead of reconstructing them with a separate fine-grained re-run.
+    fine_grained_until: int = 0
+
     # --- Logging / checkpointing ---
     save_every: int = 500
     log_every: int = 100

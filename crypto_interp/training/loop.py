@@ -173,6 +173,8 @@ def train(
     cfg_stamp = _stamp_checkpoint(cfg, datasets_dir)
     train_losses: list[float] = []
     test_losses: list[float] = []
+    fg_W_E: list[torch.Tensor] = []   # per-step W_E for the first fine_grained_until epochs
+    fg_epochs: list[int] = []
 
     tracker = (
         EmbeddingEnergyTracker(p=ds.p, device=device)
@@ -187,6 +189,10 @@ def train(
 
     for epoch in range(cfg.num_epochs):
         last_epoch_done = epoch
+        # Per-step W_E snapshot for the early fine-grained window (epoch 0 = init).
+        if cfg.fine_grained_until and epoch < cfg.fine_grained_until:
+            fg_W_E.append(model.embed.W_E.detach().cpu().clone())
+            fg_epochs.append(epoch)
         train_loss = _loss_fn(model, inputs[train_mask], labels[train_mask],
                               ds.n_answer_tokens, use_float64)
         with torch.no_grad():
@@ -226,6 +232,10 @@ def train(
 
     torch.save({"train_losses": train_losses, "test_losses": test_losses},
                run_dir / "losses.pt")
+    if fg_W_E:
+        torch.save({"W_E": torch.stack(fg_W_E), "epochs": torch.tensor(fg_epochs)},
+                   run_dir / "fine_grained.pt")
+        print(f"Saved fine-grained W_E ({len(fg_W_E)} steps): {run_dir / 'fine_grained.pt'}")
     if tracker is not None:
         tracker.save(
             run_dir / "metrics.pt",
