@@ -202,6 +202,19 @@ def char_index(p: int, device: str = "cpu") -> tuple[torch.Tensor, CharIndex]:
     return basis.double(), ci
 
 
+def fold_frequency(f: int, p: int) -> int:
+    """Real-basis index of complex frequency ``f``.
+
+    The cos/sin basis cannot distinguish frequency f from (p-1)-f, so a complex
+    character at frequency f appears at index ``min(f, (p-1)-f)``. Use this when
+    relating products in the complex character group (where indices add and can
+    exceed (p-1)/2) back to the real-basis indices the analyses report.
+    """
+    n = p - 1
+    f %= n
+    return min(f, n - f)
+
+
 if __name__ == "__main__":
     p = 113
     add_basis, add_names = additive_fourier_basis(p)

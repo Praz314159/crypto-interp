@@ -15,6 +15,7 @@ from .bases import (
     project_2d,
     CharIndex,
     char_index,
+    fold_frequency,
 )
 from .ablate import (
     project_back,
@@ -38,7 +39,7 @@ from .metrics import (
 from .grids import ab_grid_inputs, compute_logits_grid, compute_activation_grid
 from .reductions import reduce_to_ab, reduce_to_diff, fourier_spectrum_1d
 from .dynamics import cliff_step, bifurcation_step, commit_step, grokking_status
-from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs
+from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs, helper_multiplier
 
 __all__ = [
     # load
@@ -48,6 +49,7 @@ __all__ = [
     # bases
     "additive_fourier_basis", "multiplicative_fourier_basis", "primitive_root",
     "discrete_log_table", "project_1d", "project_2d", "CharIndex", "char_index",
+    "fold_frequency",
     # ablate
     "project_back", "evaluate_loss", "ablate_embedding", "ablate_character",
     "essential_characters",
@@ -64,5 +66,5 @@ __all__ = [
     # dynamics
     "cliff_step", "bifurcation_step", "commit_step", "grokking_status",
     # harmonic
-    "delta_k", "delta_k_spectrum", "find_primary_helper_pairs",
+    "delta_k", "delta_k_spectrum", "find_primary_helper_pairs", "helper_multiplier",
 ]
