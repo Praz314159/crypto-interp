@@ -36,17 +36,25 @@ Every playbook is anchored in two things:
   rider helpers via ReLU's `a₂ ≠ 0` — these are the units of the learned
   algorithm. Playbooks make them first-class verbs alongside the algebra.
 
-## The seven playbooks (by strategy)
+## The seven playbooks
 
-| # | Playbook | Strategy |
+Two reading orders. Strategy-order (numbered per the seven mech-interp
+strategies the harness implements) is logical. **Recommended reading order**
+groups the playbooks by how a researcher actually uses them: orient with
+basis-discovery, then immediately reach for activation patching — per TL's
+`getting_started_mech_interp.md`, patching is the canonical *first* causal
+probe in any mech-interp workflow, before logit attribution or weight
+ablation refinements.
+
+| Recommended order | Playbook | Strategy |
 |---|---|---|
-| 1 | `basis_discovery.md` | Find the natural basis (Strategy 1). |
-| 2 | `mechanism_verification.md` | Match circuit to algorithm (Strategy 4). |
-| 3 | `causal_intervention.md` | Weight ablation + activation patching (Strategy 3). |
-| 4 | `economy_analysis.md` | Capacity-constrained simplification (Strategy 7). |
-| 5 | `grokking_dynamics.md` | Trajectory through training (Strategy 5). |
-| 6 | `population_aggregation.md` | Replication across seeds (Strategy 6). |
-| 7 | `lattice_variation.md` | Varying p−1's prime decomposition (the first experimental program). |
+| 1. orient first | `basis_discovery.md` | Find the natural basis (Strategy 1). |
+| 2. probe causality | `causal_intervention.md` | Weight ablation + activation patching (Strategy 3). |
+| 3. name the circuit | `mechanism_verification.md` | Match circuit to algorithm (Strategy 4). |
+| 4. the economy lens | `economy_analysis.md` | Capacity-constrained simplification (Strategy 7) — our distinctive angle. |
+| 5. add time | `grokking_dynamics.md` | Trajectory through training (Strategy 5). |
+| 6. scale out | `population_aggregation.md` | Replication across seeds (Strategy 6). |
+| 7. the program | `lattice_variation.md` | Varying p−1's prime decomposition (the first experimental program the harness enables). |
 
 ## The canonical entry pattern
 

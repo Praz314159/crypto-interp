@@ -18,6 +18,16 @@ Construction::
     helpers = S.helpers(K)
     f_diff, spectrum, dom = S.delta_k_spectrum(33)
     sizes = S.cluster_sizes(K)
+
+Example (runnable on the seed-1 fixture)::
+
+    >>> from crypto_interp.interp import Session
+    >>> S = Session.from_run(
+    ...     "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1")
+    >>> sorted(S.essential()["K"])
+    [8, 10, 33, 46, 52]
+    >>> [(h, m, mult) for (h, m, mult, _e) in S.helpers([8, 10, 33, 46, 52])]
+    [(8, 52, 2), (46, 33, 2)]
 """
 
 from __future__ import annotations

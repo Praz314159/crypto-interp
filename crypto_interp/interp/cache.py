@@ -26,6 +26,7 @@ from typing import Iterator
 
 import einops
 import torch
+from jaxtyping import Float
 
 
 def _short_name(full: str) -> str:
@@ -83,8 +84,8 @@ class ActivationCache:
         )
 
     # ---------- ergonomic accessors ----------
-    def final(self, key: str) -> torch.Tensor:
-        """Slice the final sequence position: ``t[..., -1, :]`` for (batch, seq, *) shapes."""
+    def final(self, key: str) -> Float[torch.Tensor, "batch ..."]:
+        """Slice the final sequence position: ``t[..., -1, :]`` for ``(batch, seq, *)`` shapes."""
         t = self[key]
         if t.dim() < 2:
             return t
@@ -94,7 +95,7 @@ class ActivationCache:
         # patterns it's [..., -1, :]. Both behave the same for our use.
         return t[..., -1, :]
 
-    def grid(self, key: str, p: int | None = None) -> torch.Tensor:
+    def grid(self, key: str, p: int | None = None) -> Float[torch.Tensor, "p p ..."]:
         """Reshape ``(p², ...)`` → ``(p, p, ...)`` over value-token (a, b) inputs.
 
         Requires p (passed at construction or here).

@@ -27,15 +27,16 @@ Modeled on TransformerLens's ``generic_activation_patch`` but stripped
 
 from __future__ import annotations
 
-from typing import Callable, Sequence, Union
+from typing import Callable, Sequence, Union, overload
 
 import torch
+from jaxtyping import Float, Int
 
 from .cache import ActivationCache
 from .hooks import _resolve_hook_name, run_with_hooks
 
 
-MetricFn = Callable[[torch.Tensor], float]
+MetricFn = Callable[[Float[torch.Tensor, "batch pos d_vocab"]], float]
 
 
 def _patch_position_hook(clean_act: torch.Tensor, pos: int):
@@ -54,9 +55,24 @@ def _patch_all_hook(clean_act: torch.Tensor):
     return _h
 
 
+@overload
+def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
+              clean_cache: ActivationCache, hook_name: str,
+              metric_fn: MetricFn, positions: None = ...,
+              ) -> Float[torch.Tensor, "pos"]: ...
+@overload
+def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
+              clean_cache: ActivationCache, hook_name: str,
+              metric_fn: MetricFn, positions: Sequence[int] = ...,
+              ) -> Float[torch.Tensor, "n_positions"]: ...
+@overload
+def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
+              clean_cache: ActivationCache, hook_name: str,
+              metric_fn: MetricFn, positions: str = ...,
+              ) -> float: ...
 @torch.no_grad()
 def act_patch(model,
-              corrupted_inputs: torch.Tensor,
+              corrupted_inputs: Int[torch.Tensor, "batch pos"],
               clean_cache: ActivationCache,
               hook_name: str,
               metric_fn: MetricFn,
