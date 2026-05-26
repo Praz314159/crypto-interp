@@ -40,16 +40,16 @@ where $\theta_{\text{rest}}$ are the remaining weights.  The cross-entropy loss 
 Initialization: each entry of $W$ is drawn i.i.d.\ from
 $\mathcal N(0, \sigma^2 / d_{\text{model}})$.
 
-\begin{definition}[Good, bad, and Pareto-optimal initialization]
+\begin{definition}[Good, bad, and {\color{red}Pareto-optimal} initialization]
 \label{def:bgeo-good-init}
 Fix thresholds $\tau, \tau_{\text{P}} > 0$.  An initialization
 $W^{(0)}$ is
 \emph{good} if the gradient flow converges to a $W^{(\infty)}$ whose
 recovered $\mathcal K$ satisfies $c^*(W^{(\infty)}) \cdot \Delta_{\min}(\mathcal K) \geq \tau$,
 where $c^*$ is the typical per-character amplification (defined
-in~\cref{subsec:bgeo-cgap} below).  It is \emph{Pareto-optimal} if the
+in~\cref{subsec:bgeo-cgap} below).  {\color{red}It is \emph{Pareto-optimal} if the
 $\mathcal K$ it reaches lies on the cost-quality Pareto frontier of
-bases.  It is \emph{bad} otherwise.
+bases. \textbf{[The cost-quality frontier rests on the falsified $\Sigma$-orders cost --- see \texttt{cost\_atom.png}.]}}  It is \emph{bad} otherwise.
 \end{definition}
 
 Empirically, $\tau \approx 10$ separates the seeds that grok to noise floor
@@ -373,11 +373,11 @@ follow:
         the anchor selection, which in turn requires either biasing the
         early dynamics or using weight-space interventions that survive
         the first few hundred epochs of training.
-  \item The Pareto-optimal $\mathcal K$ identified in
+  \item {\color{red}The Pareto-optimal $\mathcal K$ identified in
         \cref{sec:legendre-channel} may be reachable from a specific
         subset of mixed-factor-even-anchor initializations.  Mapping which
         anchor leads to which Pareto-optimal $\mathcal K$ is the central
-        open question.
+        open question. \textbf{[``Pareto-optimal'' uses the falsified $\Sigma$-orders cost; the Legendre being cheap survives, the frontier framing does not --- see \texttt{cost\_atom.png}.]}}
 \end{enumerate}
 
 \subsection{Open questions}

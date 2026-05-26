@@ -232,6 +232,195 @@ constraints are more specific:
 
 ## Immediate next step
 
+*(superseded — see "Updated immediate next step" at the bottom of the
+2026-05-25 update.)*
+
 Square root mod p (Thread 1, single-token regime). First milestone: train a
 small transformer to grok square root mod a small prime p, then compare the
 learned circuit to Tonelli–Shanks and Cipolla.
+
+---
+
+## 2026-05-25 — Update: paper consolidation and new research threads
+
+The work has consolidated around modular **multiplication** as the focal task,
+with a paper in preparation. This section captures the current state and the
+threads not yet executed.
+
+### Paper status
+
+- **Scope:** one paper, top main-track (ICLR/NeurIPS), spine = **mechanism +
+  economy** in modular multiplication; dynamics/de-grokking/methods as
+  appendices.
+- **Act I — the learned algorithm:** the multiplicative-Fourier / discrete-log
+  algorithm; Pontryagin duality realized by GD; **the Legendre channel**
+  (minimal 9-neuron order-2 circuit) as the showcase of multiplicative-specific
+  structure (`notes/02_legendre_channel.tex`).
+- **Act II — the capacity-constrained economy:** the empirical **cost atom**
+  (neurons ≈ budget/#primaries, order-2 ≈ 6.6× cheaper, doublings cost 0);
+  the **doubling helper as a free-rider** (ReLU 2nd harmonic at a₂=2/3π,
+  a₃=0; helpers free on the neuron/output side, paid on the embedding/input
+  side per the sufficiency test); ≈3-doubling-pair-cluster backbone across 21
+  grokked seeds; cross-prime generalization (p=113/127/181 — in progress).
+- **Contribution boundary (post Gromov scoop-check):** Gromov (2023) owns the
+  harmonic fact (a squaring nonlinearity produces χ_{2k}); the
+  **economy/allocation framing** in the *multiplicative* setting is ours —
+  what a trained, budget-limited net spontaneously does with the harmonic
+  (free-rider on shared clusters, load-bearing, the building block of
+  capacity economization). Lead with allocation, cite Gromov as substrate.
+- **Related-work map:** Nanda 2023 (additive Fourier basis methodology);
+  Chughtai/Chan/Nanda 2023 (characters/irreps-as-features framework);
+  Zhong et al. *Clock & Pizza* (nonlinearity-selects-algorithm — qualitative
+  precedent to our quantitative spectral law); Marchetti et al. 2026
+  (sequential group composition with polynomial activations — depth-as-
+  associativity but not iterated squaring); Wu et al. ICLR 2025 (formal-
+  verification standard — pre-empt with a compact proof of the Legendre
+  circuit); McCracken et al. *aCRT* NeurIPS 2025 (additive CRT; opens the
+  neurons-per-frequency question we answer); Mohamadi et al. (margin theory
+  of grokking *onset* — our de-grokking is a counterexample to margin-
+  monotonicity, outside their no-WD assumption); Gromov 2023 (analytic
+  single-hidden-layer; explicitly leaves depth open).
+- **Pending manuscript work:** reconcile `notes/` with this session's
+  corrections — the Pareto frontier was falsified by the empirical cost atom
+  (`cost_atom.png`) and is red-flagged in `notes/03,04`; `notes/06` should
+  be reframed as *allocation-under-constraint* with Gromov cited as substrate;
+  population numbers (21 seeds), the sufficiency result, and the de-grokking
+  appendix all need folding in.
+
+### Thread 6 — Library and methodology: TransformerLens transfer
+
+`crypto_interp` has strong **domain primitives** (the `interp/` package —
+multiplicative-Fourier bases, character indexing, essential-character
+ablation, harmonic-helper detection, dynamics detectors) but **ad-hoc
+scaffolding** (custom hook-less caches, no patching utilities, no factored-
+matrix tools for attention analysis). TransformerLens
+(`/Users/prashanth/Desktop/Research/cryptography/TransformerLens`) is the
+gold-standard reference for that scaffolding.
+
+**Abstractions to study and adopt:**
+
+- **`HookedTransformer` + `hook_points`:** hook-at-every-internal-point
+  architecture; clean separation of the model from the cache/intervention API.
+- **`ActivationCache`:** cache abstraction with selector APIs (cache by name,
+  by component) — replaces hand-rolled dict caches.
+- **`patching.py` (activation and path patching):** the canonical *causal*
+  intervention (run two models, swap an activation at a hook point, measure
+  logit change). We have ad-hoc ablations (`ablate_character`,
+  `ablate_embedding`) and exact Δ_k (`delta_k`); the general patching
+  framework would unlock attention-head analysis, residual-stream-position
+  interventions, and path patching for circuit isolation.
+- **`FactoredMatrix`:** low-rank linear-algebra utilities for `W_Q @ W_K^T`
+  (the QK circuit) and `W_V @ W_O` (the OV circuit) without materializing
+  the full matrices — directly addresses the ad-hoc-only attention/path
+  themes in `experiments/ANALYSES.md` (§8, §10).
+- **`SVDInterpreter.py`, `head_detector.py`:** rank-decomposition and
+  attention-pattern classifiers; templates we lack.
+
+**Integration paths** (decision needed after exploration):
+1. **Wrap:** use `HookedTransformer` directly; rewrite our cache/ablate to
+   call into it. Pro: maximal technique transfer. Con: TL's model class may
+   not match our grokking-friendly tiny no-LN architecture exactly.
+2. **Adopt patterns:** keep our model class, port TL's API patterns
+   (`HookPoint`, `ActivationCache`, `patching`) into `crypto_interp/interp`.
+   Pro: preserves architectural control. Con: more porting work.
+
+Entry points: `TransformerLens/demos/Main_Demo.ipynb`, then
+`transformer_lens/patching.py` and `ActivationCache.py`.
+
+### Thread 7 — Multilayer / depth as iterated squaring
+
+**Hypothesis:** stacking transformer blocks lets the network *iterate* the
+ReLU squaring step — block 1 produces χ_{2k} from χ_k, block 2 squares
+χ_{2k} to χ_{4k} at full strength (rather than relying on a₄, which is
+weak). So **max Sylow-2 doubling-chain depth ≈ number of stacked nonlinear
+layers**, capped by v₂(p−1). Rehabilitates the retired Sylow-chain-depth
+idea: chain depth comes from network depth, not from p−1's factorization
+within a single layer.
+
+**Experiment (depth-vs-width controlled):** matched total ReLU neurons
+across (depth, width) configs at tight per-layer width — e.g., M=36 total:
+(L=1, d_mlp=36), (L=2, d_mlp=18), (L=3, d_mlp=12). Measure helper-chain
+depth + grok rate. Predict deeper-narrower nets exploit the tower while
+shallower-wider don't.
+
+**Blocked on:** `num_layers` plumbing fix (~3 lines in `training/loop.py`
+and `interp/load.py`, plus `.get('num_layers', 1)` for backward-compat).
+
+**Honest caveats:** depth-2 chains aren't necessary (1-layer groks), so the
+model only exploits the tower if *forced* by tight per-layer width; deeper
+nets are harder to interpret (more places computation can hide); added
+attention rounds confound (cleanest version is MLP-only depth — invasive).
+
+### Thread 8 — Size reduction: locating the hard grokking floor
+
+At d_model=24, d_mlp=20, wd=2.0 the model groks ≈38% stable / ≈52%
+ever-grokked. We have not found a configuration that **prevents grokking
+outright**. Sweep d_mlp ∈ {16, 12, 10, 8, 6} (and/or d_model ∈ {20, 18,
+16}), 10 seeds each at wd=2, locate the grok → no-grok transition.
+Predicted: d_mlp ≤ 8 should fail (below the bilinear-fidelity floor for a
+primary). The transition is the datum.
+
+### Thread 9 — Activation harmonic-parity generalization (Act II supporting)
+
+The doubling economy is a property of ReLU's harmonics (a₁=½, a₂=2/3π,
+a₃=0). Sweep σ ∈ {ReLU, GELU, SiLU, tanh, cube, square} at constrained
+d_mlp. Prediction (numerically grounded — see `cost_atom.png` and the
+harmonic-coefficient table): even-harmonic σ (ReLU/GELU/SiLU) → χ_{2k}
+doubling economy; **odd σ (tanh/cube) → χ_{3k} tripling economy**. Same
+algorithm, different "free" character determined by the nonlinearity's
+parity. Doubles as the second-architecture robustness axis required for
+main-track.
+
+### Thread 10 — Capacity-constrained economy as a multilayer-interpretability lever
+
+A methodological extension of Thread 7: **the constraint is itself the
+interpretability tool.** Hypothesis — starving multilayer nets forces them
+into the minimal algebraic structure (Sylow tower spread across layers +
+≈3-cluster backbone), making the multilayer computation legible group-
+theoretically where the unconstrained version would be a mess. Tests whether
+economy is just a phenomenon to study or a *lever for interpretability*.
+Plausibly the strongest single methods contribution if it lands; depends on
+Thread 7's outcome.
+
+### Thread 11 — KAN as a decoupling probe
+
+Kolmogorov–Arnold Networks replace fixed activations with learnable spline
+edges → no fixed harmonic structure → the doubling economy is no longer
+forced by σ. Test: does a KAN still economize (economy is an intrinsic
+preference) or not (economy is a fingerprint of the fixed nonlinearity)?
+Larger implementation lift; supporting result, not load-bearing.
+
+### Thread 12 — The additive↔multiplicative bridge (next-paper-scale)
+
+The deepest unexplored direction. Addition and multiplication live in
+*different* algebraic homes — additive characters on (Z/p,+) vs
+multiplicative/Dirichlet characters on ((Z/p)*,×). A task needing both
+forces the model to bridge them via the **discrete log / antilog** — the
+structural heart of a finite field. No paper in our collection studies this.
+
+Tasks: minimal = **fused multiply-add `a·b + c mod p`** (the +c cannot be
+done in dlog space → forces antilog); richer = polynomial evaluation /
+Horner; **Euler's criterion** `a^((p−1)/2)` (ties straight back to the
+Legendre result); the **Number-Theoretic Transform** (used in fast
+multiplication and lattice crypto — connects to
+`papers/salsa_lattice_attack.pdf`). Questions: (i) do learned + and ×
+sub-circuits compose *modularly*, (ii) how is the multiplicative→additive
+conversion implemented, (iii) does the economy survive across the bridge.
+Aligns with the project-goals "generic engine" thread.
+
+---
+
+## Updated immediate next step
+
+1. **In flight (Colab, Drive-resident with skip-resume):** cross-prime
+   population sweep, n=20 at p=127 and p=181. Output completes the
+   cross-prime row of Act II.
+2. **Next (no compute):** TransformerLens exploration (Thread 6) — read
+   `Main_Demo.ipynb` and `transformer_lens/patching.py`, then propose an
+   integration plan for `crypto_interp` (Wrap vs Adopt-patterns).
+3. **Queued (Colab, after cross-prime):** size-reduction sweep (Thread 8)
+   and the activation-parity sweep (Thread 9); the latter needs the MLP
+   activation made config-driven (~5-line change).
+4. **Deferred:** manuscript reconciliation (Pareto out, cost-atom in,
+   Gromov-bounded framing); multilayer / depth sweep (after `num_layers`
+   plumbing fix); KAN; +/× compositional task.

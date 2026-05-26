@@ -61,14 +61,14 @@ across 17 random seeds at this configuration.
   \Zp{16} \times \Zp{7}$. The character group factors correspondingly,
   and any separating $\mathcal K$ must contain at least one character
   with order divisible by 16 and at least one with order divisible by 7.
-  The cheapest such pair has orders $(16, 7)$, giving an
+  {\color{red}\textbf{[$\Sigma$-orders cost numbers below are FALSIFIED (see \texttt{cost\_atom.png}); the CRT \emph{feasibility} constraint above survives, the cost-bound does not.]} The cheapest such pair has orders $(16, 7)$, giving an
   $d_{\text{mlp}}$-cost lower bound of $16 + 7 = 23$. The choice of
   primitive characters ($\ord(k) = 112$) by SGD is consistent with this
   bound --- one primitive covers both CRT factors at once. The
   empirical $d_{\text{mlp}}$-cost across seeds (88 to 448) is
-  always well above the floor.
+  always well above the floor.}
 
-\item \textbf{The basis-cost Pareto frontier maps the feasible algorithm
+\item {\color{red}\textbf{[FALSIFIED: the $\sum_{o} o$ ($\Sigma$-orders) $d_{\text{mlp}}$-cost axis used below is empirically wrong --- measured neurons/character scale with the \emph{budget}, not order ($\mathrm{corr}(\text{order},\text{neurons})\approx0.15$); order-2 is $\sim$6.6$\times$ cheaper; doublings cost 0 neurons. The entire frontier rests on this invalid cost axis. See \texttt{cost\_atom.png}.]} \textbf{The basis-cost Pareto frontier maps the feasible algorithm
   space.} For each order multiset $M$ (a tuple of character orders
   drawn from divisors of $p-1$, $|M| = |\mathcal K|$) we can compute
   three derived quantities purely combinatorially: the
@@ -87,7 +87,7 @@ across 17 random seeds at this configuration.
   Pareto-optimal bases, only feasible ones. The CRT bound of point (5)
   is one limit point on this frontier (its bottom-left corner). The
   diversity of seed multisets (16 distinct out of 17) reflects the rich
-  interior of the feasible region.
+  interior of the feasible region.}
 
 \end{enumerate}
 
@@ -154,11 +154,11 @@ across 17 random seeds at this configuration.
   $10^{-6.7}$ by epoch $\sim 5{,}000$ versus epochs of 7{,}000--24{,}000
   in the default. The interpretation is that tighter capacity
   constrains $\mathcal K$ to a smaller feasible set, eliminating
-  exploration time among many viable bases. Architecturally,
+  exploration time among many viable bases. {\color{red}\textbf{[Pareto-frontier / $\Sigma$-orders reasoning --- FALSIFIED, see \texttt{cost\_atom.png}.]} Architecturally,
   the d\_mlp budget forces SGD toward the left half of the
   Pareto frontier identified in point (6): at $d_{\text{mlp}} = 64$
   no current observed seed's multiset fits the budget, and the model
-  must find a different (smaller-cost) basis. This combination of
+  must find a different (smaller-cost) basis.} This combination of
   capacity pressure plus the basin-strength predictor of point (9)
   links architectural cost directly to grokking time.
 
@@ -179,10 +179,10 @@ across 17 random seeds at this configuration.
   whether the model's representations are \emph{modular} in the algebraic
   sense.
 
-\item Can architectural pressure or stratified curricula push observed
+\item {\color{red}Can architectural pressure or stratified curricula push observed
   seeds onto the Pareto frontier of point (6)? The current 17 seeds all
   sit in the interior. The d\_mlp sweep is the first test; iterative
-  pruning, capacity annealing, or curriculum may push closer.
+  pruning, capacity annealing, or curriculum may push closer. \textbf{[Pareto frontier rests on the falsified $\Sigma$-orders cost --- see \texttt{cost\_atom.png}.]}}
 
 \item For groups with richer subgroup lattices (e.g., $\Zpstar{211}$ with
   $p-1 = 2 \cdot 3 \cdot 5 \cdot 7$), does the curriculum-induced
