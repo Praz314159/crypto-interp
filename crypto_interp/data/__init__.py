@@ -1,11 +1,12 @@
 """Dataset registry. Add new tasks by creating a module with a ``build`` fn."""
 
 from .base import Dataset
-from . import mul, sqrt as sqrt_mod  # avoid shadowing math.sqrt elsewhere
+from . import mul, add, sqrt as sqrt_mod  # avoid shadowing math.sqrt elsewhere
 from .io import load_or_build, save, load, cache_path
 
 _TASKS = {
     "mul": mul.build,
+    "add": add.build,
     "sqrt_of_product": sqrt_mod.build,
 }
 
