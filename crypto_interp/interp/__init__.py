@@ -8,6 +8,7 @@ from .load import load_run, latest_checkpoint
 from .activations import cache_all, reshape_pp, summary, run_with_cache
 from .cache import ActivationCache
 from .hooks import run_with_hooks, hooks, zero_hook, patch_hook, project_hook
+from .session import Session
 from .bases import (
     additive_fourier_basis,
     multiplicative_fourier_basis,
@@ -50,6 +51,7 @@ __all__ = [
     "cache_all", "reshape_pp", "summary", "run_with_cache",
     "ActivationCache",
     "run_with_hooks", "hooks", "zero_hook", "patch_hook", "project_hook",
+    "Session",
     # bases
     "additive_fourier_basis", "multiplicative_fourier_basis", "primitive_root",
     "discrete_log_table", "project_1d", "project_2d", "CharIndex", "char_index",
