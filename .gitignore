@@ -30,10 +30,7 @@ experiments/*/data/
 experiments/lattice_variation/
 experiments/theory_trajectory/
 experiments/noise_decomposition/
-experiments/margin_analysis/
-experiments/token_localization/
-experiments/embedding_residual/
-experiments/embedding_patch/
+experiments/error_localization/
 
 # Drive-imported sweep archives — large, regeneratable on Colab
 imported_data/
