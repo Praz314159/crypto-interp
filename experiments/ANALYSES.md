@@ -5,15 +5,31 @@ A map of every analysis we have tried across experiments, organized by the
 `crypto_interp/`, prime-parametric, reusable) and the **ad-hoc** exploration
 scripts (in `experiments/<id>/scripts/`, often run-specific).
 
+> **Update 2026-05-26 — harness v1 landed.** The recommended way to write a
+> new analysis is to compose verbs from `crypto_interp.interp` (`Session`,
+> `act_patch`, `ablate_char_w`, etc.) — usually 5–15 lines, no script
+> needed. The canonical recipes are documented in
+> [`crypto_interp/playbooks/`](../crypto_interp/playbooks/). Existing
+> ad-hoc scripts in `experiments/<id>/scripts/` are kept for reference but
+> should be **phased out, not extended**. New analyses → playbooks +
+> notebook/Claude turn, not new scripts.
+
 ## How the code is layered
 
-- **`crypto_interp/interp/`** — reusable primitives (bases, ablation, metrics,
-  dynamics detectors, harmonic-helper detection). Import these; don't re-implement.
-- **`crypto_interp/analysis/`** — canonical, runnable analyses (`python -m
-  crypto_interp.analysis.<name> --run-dir ...`). Prime-parametric.
-- **`experiments/<id>/scripts/`** — ad-hoc / experiment-specific scripts. Many
-  predate the `crypto_interp` extraction and duplicate logic now canonicalized
-  (see *Cleanup candidates* at the end).
+- **`crypto_interp/interp/`** — reusable primitives + scaffolding (bases,
+  ablation, metrics, dynamics detectors, harmonic-helper detection,
+  ActivationCache, hooks, interventions, activation patching, Session).
+  Import these; don't re-implement.
+- **`crypto_interp/analysis/`** — canonical, runnable CLI analyses (`python
+  -m crypto_interp.analysis.<name> --run-dir ...`). Prime-parametric.
+  After v1, these are thin wrappers around `Session`.
+- **`crypto_interp/playbooks/`** — markdown recipes documenting how to
+  compose the library verbs to answer common questions (basis discovery,
+  causal intervention, mechanism verification, economy analysis, etc.).
+  These are the canonical entry point for new analyses.
+- **`experiments/<id>/scripts/`** — ad-hoc / experiment-specific scripts.
+  Many predate the v1 harness; treat as historical reference. Do not add
+  new scripts here.
 
 Experiment 002 has **no scripts of its own** — it reuses experiment 001's
 `--ckpt`-driven scripts. Experiments 004 (p=127) and 005 (p=181) currently have

@@ -287,7 +287,44 @@ threads not yet executed.
   population numbers (21 seeds), the sufficiency result, and the de-grokking
   appendix all need folding in.
 
-### Thread 6 — Library and methodology: TransformerLens transfer
+### Thread 6 — Library and methodology: TransformerLens transfer  *(v1 landed)*
+
+**Status (2026-05-26):** harness v1 merged from branch `harness-v1`. The
+gap described below is closed. See [`crypto_interp/playbooks/README.md`](crypto_interp/playbooks/README.md)
+for the canonical recipes; [`crypto_interp/README.md`](crypto_interp/README.md)
+is the library entry point.
+
+What landed:
+
+- `ActivationCache` class with short-name aliases (`mlp_post` ↔
+  `blocks.0.mlp.hook_post`) and `.final` / `.grid` / `.decompose_resid`.
+- `run_with_cache`, `run_with_hooks`, `hooks(...)` context manager.
+- Weight-space interventions as context managers (`weight_patch`,
+  `ablate_char_w`, `freeze_param`), replacing the inline try/finally
+  pattern in `grids.py` / `harmonic.py` / `ablate.py`.
+- Activation patching: `act_patch` + `patch_mlp_out` / `patch_resid_pre`
+  / `patch_attn_out`.
+- `Session` — the analysis bundle bundling `(model, ds, basis, ci)`
+  with lazy `cache` and one-line passthroughs to all the domain verbs.
+- Layering fix: per-neuron-cluster helpers moved from `analysis/` to
+  `interp/neurons.py`; analyses now depend on interp, never the other way.
+- A second task (`modular_add`) registered in the data layer, plus a
+  stub `experiments/006_add_p113/config.py`.
+- Seven markdown playbooks documenting the canonical recipes for each
+  mech-interp strategy.
+- Smoke tests (`tests/test_harness_smoke.py`); the existing 16-test
+  suite still passes (20/20 total).
+
+Deferred to v2 (after the lattice-variation experimental program):
+
+- `Task` / `AlgebraicDomain` dataclass. The current data layer dispatches
+  by string; that's fine until the lattice-variation experiments reveal
+  what algebraic metadata is actually used by the analyses.
+- `FactoredMatrix`. Dense math is fine at d_model=24; revisit when
+  attention pathway analysis becomes load-bearing (multi-block / longer
+  contexts).
+
+**Original gap analysis kept below for historical context:**
 
 `crypto_interp` has strong **domain primitives** (the `interp/` package —
 multiplicative-Fourier bases, character indexing, essential-character
