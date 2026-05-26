@@ -121,7 +121,7 @@ class Session:
     def per_neuron_dominant_char(self) -> tuple[np.ndarray, np.ndarray]:
         """``(char_E[d_mlp, n_chars], dominant_char[d_mlp])``; cached after first call."""
         if self._dom is None:
-            from ..analysis.neuron_clusters import per_neuron_dominant_char
+            from .neurons import per_neuron_dominant_char
             self._dom = per_neuron_dominant_char(
                 self.model.unembed.W_U.detach(),
                 self.model.blocks[0].mlp.W_out.detach(),
@@ -142,7 +142,7 @@ class Session:
         Returns the (p-1, p-1) residual-stream signal aligned with the
         unembed's χ_k read direction, or None if no neurons dominate at k.
         """
-        from ..analysis.neuron_clusters import cluster_signal as _cs
+        from .neurons import cluster_signal as _cs
         _, dom = self.per_neuron_dominant_char()
         cluster = np.where(dom == k)[0]
         if len(cluster) == 0:
@@ -155,7 +155,7 @@ class Session:
 
     def reference_signal(self, k: int) -> np.ndarray:
         """Algebraic reference ``cos(θ_k(a) + θ_k(b))`` over the (a, b) grid."""
-        from ..analysis.neuron_clusters import reference_cos_signal
+        from .neurons import reference_cos_signal
         return reference_cos_signal(k, self.ds.p)
 
     # ---------- metrics and forward verbs ----------

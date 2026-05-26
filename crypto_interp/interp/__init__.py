@@ -29,7 +29,13 @@ from .ablate import (
     ablate_character,
     essential_characters,
 )
-from .neurons import matched_bigrams, compute_per_neuron_frequency_energy
+from .neurons import (
+    matched_bigrams,
+    compute_per_neuron_frequency_energy,
+    per_neuron_dominant_char,
+    cluster_signal,
+    reference_cos_signal,
+)
 from .metrics import (
     per_frequency_energy_from_embedding,
     EmbeddingEnergyTracker,
@@ -65,6 +71,7 @@ __all__ = [
     "essential_characters",
     # neurons
     "matched_bigrams", "compute_per_neuron_frequency_energy",
+    "per_neuron_dominant_char", "cluster_signal", "reference_cos_signal",
     # metrics
     "per_frequency_energy_from_embedding", "EmbeddingEnergyTracker",
     "char_energy", "char_energy_batch", "order_energy", "order_of",

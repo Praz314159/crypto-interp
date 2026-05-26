@@ -1,16 +1,19 @@
 """Full per-character ablation sweep.
 
-For a trained model, ablate each multiplicative character from W_E one at a time
-and measure the resulting test loss. Plot "essentialness" (Δlog10 test loss) vs
-character order and vs the character's W_E energy. Answers whether K is genuinely
-sparse or has a smooth tail of load-bearing characters.
+For a trained model, ablate each multiplicative character from W_E one at a
+time and measure the resulting test loss. Plot "essentialness" (Δlog10 test
+loss) vs character order and vs the character's W_E energy. Answers whether
+K is genuinely sparse or has a smooth tail of load-bearing characters.
 
-Uses crypto_interp.interp.essential_characters (prime-parametric).
+Migrated to the v1 harness: uses :class:`crypto_interp.interp.Session` for
+loading + analysis. The body shrunk from ~80 lines of setup (load_run +
+char_index + essential_characters) to just the CSV/PNG glue around
+``S.essential()``.
 
-Writes ``ablation_full_<tag>.{csv,png}`` to --out-dir (default: the run dir).
+Writes ``ablation_full_<tag>.{csv,png}`` to ``--out-dir`` (default: run dir).
 
 Usage:
-    python -m crypto_interp.analysis.ablation_full \
+    python -m crypto_interp.analysis.ablation_full \\
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1
 """
 from __future__ import annotations
@@ -22,7 +25,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from crypto_interp.interp import char_index, essential_characters, load_run
+from crypto_interp.interp import Session
 
 ORDER_COLOR = {
     2: "#9467bd", 4: "#8c564b", 7: "#bcbd22", 8: "#17becf",
@@ -40,20 +43,17 @@ def main():
     out_dir = Path(args.out_dir).resolve() if args.out_dir else run_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = args.tag or run_dir.name
-    ck = sorted(run_dir.glob("checkpoint_*.pt"))
-    print(f"Loading {ck[-1]}")
-    model, ds, _ = load_run(ck[-1])
-    model.eval()
-    basis, ci = char_index(ds.p)
 
-    res = essential_characters(model, ds, ci, basis)
+    S = Session.from_run(run_dir)
+    print(f"Loaded {run_dir.name}")
+    res = S.essential()
     base, per, K_top = res["base_loss"], res["per_char"], set(res["K"])
     print(f"Top-K (5% threshold): {sorted(K_top)}")
     print(f"Baseline test loss: {base:.4e}  (log10 = {np.log10(base):.3f})")
 
     rows = [dict(k=k, order=per[k]["order"], energy=per[k]["energy"],
                  ablated=per[k]["ablated_loss"], delta_log=per[k]["dlog10"],
-                 in_top_K=k in K_top) for k in ci.freqs]
+                 in_top_K=k in K_top) for k in S.ci.freqs]
 
     rows.sort(key=lambda r: r["delta_log"], reverse=True)
     print(f"\n{'k':>4} {'o':>4} {'energy':>10} {'ablated':>12} {'Δlog10':>8} {'topK':>5}")
