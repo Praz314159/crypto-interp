@@ -34,7 +34,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 
 from crypto_interp.interp import Session
 from crypto_interp.interp.load import load_run

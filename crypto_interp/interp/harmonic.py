@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from .ablate import ablate_character
 from .bases import CharIndex, fold_frequency
 from .grids import compute_logits_grid
 from .reductions import fourier_spectrum_1d, reduce_to_diff

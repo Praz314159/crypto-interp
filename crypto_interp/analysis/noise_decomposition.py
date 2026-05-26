@@ -50,7 +50,6 @@ import numpy as np
 
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.interp.theory import observed_kernel
 
 
 def reindex_logits_by_dlog(logits_grid: np.ndarray, p: int) -> np.ndarray:
@@ -234,7 +233,7 @@ def print_summary(d: dict) -> None:
     print(f"  L_empirical = {d['L_empirical']:.4g}")
     print(f"  L_symmetric = {d['L_symmetric']:.4g}")
     print(f"  total residual power = {d['total_residual_power']:.4g}")
-    print(f"\n  per-class L² contributions (fraction of total residual power):")
+    print("\n  per-class L² contributions (fraction of total residual power):")
     total = d["total_residual_power"]
     classes = ["algorithm", "single_a", "single_b", "single_c",
                "pair_ac", "pair_bc", "pair_ab",
@@ -375,7 +374,7 @@ def main():
         results.append(d)
         print_summary(d)
         # Top modes
-        print(f"\n  Top 8 individual modes by power:")
+        print("\n  Top 8 individual modes by power:")
         print(f"    {'k_a':>4} {'k_b':>4} {'k_c':>4}  {'power':>11}  {'class':>15}  notes")
         for tm in d["top_modes"][:8]:
             algkc = tm["fold_kc_neg"]

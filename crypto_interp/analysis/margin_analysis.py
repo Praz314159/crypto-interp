@@ -37,8 +37,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from crypto_interp.interp import Session
-from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.interp.theory import observed_kernel
 
 
 def margin_breakdown(run_dir: Path) -> dict:
@@ -112,14 +110,14 @@ def print_one(d: dict) -> None:
     print(f"  wrong examples:  {d['n_wrong']} / {d['n_total']}")
     print(f"  kernel margin (constant across (a,b)): {d['kernel_margin']:.4g}")
     m = d["margin"]
-    print(f"  margin distribution:")
+    print("  margin distribution:")
     print(f"    min:        {m.min():.4g}")
     print(f"    1st pct:    {np.percentile(m, 1):.4g}")
     print(f"    median:     {np.median(m):.4g}")
     print(f"    99th pct:   {np.percentile(m, 99):.4g}")
     print(f"    max:        {m.max():.4g}")
     if d["wrong_pairs"]:
-        print(f"  first 10 incorrect (a, b) → predicted vs target  (margin):")
+        print("  first 10 incorrect (a, b) → predicted vs target  (margin):")
         for w in d["wrong_pairs"][:10]:
             print(f"    a={w['a']:>3}, b={w['b']:>3}  pred={w['predicted']:>3}  "
                   f"target={w['target']:>3}  margin={w['margin']:+.3g}")

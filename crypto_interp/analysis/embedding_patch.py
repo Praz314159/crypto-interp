@@ -152,7 +152,7 @@ def print_one(d: dict) -> None:
     print(f"  K = {d['K']}")
     b = d["baseline"]
     print(f"  baseline:  acc={b['acc']:.4%}  CE={b['ce']:.4g}  n_wrong={b['n_wrong']}")
-    print(f"\n  Patch threshold T (leakage_frac ≥ T) → patched tokens, new accuracy:")
+    print("\n  Patch threshold T (leakage_frac ≥ T) → patched tokens, new accuracy:")
     print(f"  {'T':>6}  {'n_patched':>9}  {'acc':>10}  {'CE':>11}  {'n_wrong':>7}  patched")
     for r in d["thresholds"]:
         pt = r["patched_tokens"][:10]
@@ -162,7 +162,6 @@ def print_one(d: dict) -> None:
 
 
 def plot_population(results: list[dict], out_dir: Path) -> None:
-    n_seeds = len(results)
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
 
     # (a) accuracy vs threshold

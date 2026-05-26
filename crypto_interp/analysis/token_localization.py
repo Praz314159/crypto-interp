@@ -24,7 +24,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 
 from crypto_interp.interp import Session
 
@@ -32,7 +31,6 @@ from crypto_interp.interp import Session
 def analyze_one(run_dir: Path) -> dict:
     S = Session.from_run(str(run_dir))
     p = S.ds.p
-    n = p - 1
     logits = S.logits_grid.detach().cpu().numpy()[..., :p].astype(np.float64)
 
     a_idx = np.arange(1, p)[:, None]
@@ -92,17 +90,17 @@ def print_one(d: dict) -> None:
         print("  (no errors — nothing to localize)")
         return
 
-    print(f"\n  per-input-token A error rate:")
+    print("\n  per-input-token A error rate:")
     a_out = find_outlier_tokens(d["err_by_a"])
     print(f"    mean = {d['err_by_a'].mean():.4%},  std = {d['err_by_a'].std():.4%}")
     print(f"    >3σ outliers ({len(a_out)}): {a_out[:10]}")
 
-    print(f"\n  per-input-token B error rate:")
+    print("\n  per-input-token B error rate:")
     b_out = find_outlier_tokens(d["err_by_b"])
     print(f"    mean = {d['err_by_b'].mean():.4%},  std = {d['err_by_b'].std():.4%}")
     print(f"    >3σ outliers ({len(b_out)}): {b_out[:10]}")
 
-    print(f"\n  per-target-class error rate:")
+    print("\n  per-target-class error rate:")
     t_out_arr = d["err_by_target"][1:]  # skip class 0
     mean, std = t_out_arr.mean(), t_out_arr.std()
     t_out = []

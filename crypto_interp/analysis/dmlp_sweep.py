@@ -17,7 +17,6 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 
 from crypto_interp.interp import char_energy, char_index, find_cliff, order_of

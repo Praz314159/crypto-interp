@@ -166,7 +166,7 @@ def print_one(d: dict) -> None:
 
     # Print the top 5 leaky tokens
     top_leaky = np.argsort(lf)[::-1][:8]
-    print(f"\n  Top 8 leakiest tokens (token=residue, frac=leakage/total, err_rate):")
+    print("\n  Top 8 leakiest tokens (token=residue, frac=leakage/total, err_rate):")
     for i in top_leaky:
         print(f"    token {i+1:>3}  leakage_frac={lf[i]:.4%}  "
               f"err_rate={err[i]:.4%}  total_norm²={lk['total_per_token'][i]:.4g}")

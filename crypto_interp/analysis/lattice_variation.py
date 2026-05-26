@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
-import math
 from collections import Counter
 from pathlib import Path
 
@@ -135,9 +134,9 @@ def summarize(per_prime: dict[int, list[dict]]) -> None:
         if mult_ct:
             print(f"  helper multipliers:  {dict(sorted(mult_ct.items()))}")
         else:
-            print(f"  helper multipliers:  (none observed — loose capacity?)")
+            print("  helper multipliers:  (none observed — loose capacity?)")
         # Per-seed detail
-        print(f"  per-seed:")
+        print("  per-seed:")
         for r in sorted(grokked, key=lambda r: r["run_dir"]):
             seed_name = Path(r["run_dir"]).name
             cov = "✓" if r["all_covered"] else "✗"

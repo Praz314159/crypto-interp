@@ -26,6 +26,18 @@ experiments/*/datasets/
 experiments/*/figures/
 experiments/*/data/
 
+# Analysis outputs at experiments/ root — regenerable, contain figures + CSVs
+experiments/lattice_variation/
+experiments/theory_trajectory/
+experiments/noise_decomposition/
+experiments/margin_analysis/
+experiments/token_localization/
+experiments/embedding_residual/
+experiments/embedding_patch/
+
+# Drive-imported sweep archives — large, regeneratable on Colab
+imported_data/
+
 # Background-task / debug logs
 *.log
 

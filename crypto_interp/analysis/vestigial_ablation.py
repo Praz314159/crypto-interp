@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
 
 from crypto_interp.interp import char_index, essential_characters, load_run
 
