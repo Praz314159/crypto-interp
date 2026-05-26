@@ -21,21 +21,18 @@ def ab_grid_inputs(ds) -> torch.Tensor:
 def compute_logits_grid(model, ds, W_E_override: torch.Tensor | None = None) -> torch.Tensor:
     """Final-position logits over the (a, b) grid, shape (p-1, p-1, vocab).
 
-    If ``W_E_override`` is given it is temporarily swapped into the embedding and
-    restored afterwards (via try/finally, so an exception in the forward pass
-    cannot leak the override).
+    If ``W_E_override`` is given it is temporarily swapped into the embedding
+    via :func:`crypto_interp.interp.interventions.weight_patch` and restored
+    on exit (so an exception in the forward pass cannot leak the override).
     """
     p = ds.p
     inputs = ab_grid_inputs(ds).to(next(model.parameters()).device)
     if W_E_override is None:
         logits = model(inputs)[:, -1, :].double()
     else:
-        orig = model.embed.W_E.detach().clone()
-        try:
-            model.embed.W_E.copy_(W_E_override.to(model.embed.W_E.dtype))
+        from .interventions import weight_patch
+        with weight_patch(model, "embed.W_E", W_E_override):
             logits = model(inputs)[:, -1, :].double()
-        finally:
-            model.embed.W_E.copy_(orig)
     return logits.reshape(p - 1, p - 1, -1)
 
 

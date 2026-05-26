@@ -1,12 +1,17 @@
 """Identify the cluster of MLP neurons specialized to each character k in K,
-reconstruct the cluster's contribution to the residual stream as a function of
-(a, b), and compare against the algebraic reference cos(θ_k(a)+θ_k(b)).
+reconstruct the cluster's contribution to the residual stream as a function
+of (a, b), and compare against the algebraic reference cos(θ_k(a)+θ_k(b)).
 
-Four panels per character: cluster signal (natural + dlog-sorted) and reference
-(natural + dlog-sorted). Uses crypto_interp.interp (prime-parametric).
+Four panels per character: cluster signal (natural + dlog-sorted) and
+reference (natural + dlog-sorted).
+
+Migrated to the v1 harness: ``per_neuron_dominant_char``, ``cluster_signal``
+and ``reference_cos_signal`` now live in :mod:`crypto_interp.interp.neurons`
+(so analyses depend on interp, not the other way around). This module is the
+CLI wrapper that drives them via :class:`crypto_interp.interp.Session`.
 
 Usage:
-    python experiments/003_dmodel_sweep_p113/scripts/analyze_neuron_clusters.py \
+    python -m crypto_interp.analysis.neuron_clusters \\
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1
 """
 from __future__ import annotations
@@ -16,55 +21,19 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 
 from crypto_interp.interp import (
-    char_energy,
-    char_index,
+    Session,
     correlate,
     discrete_log_table,
-    load_run,
     order_of,
 )
-
-
-def per_neuron_dominant_char(W_U, W_out, basis, ci, p):
-    """Return (char_E [d_mlp, n_chars], dominant_char [d_mlp]) (1-based ids)."""
-    V = W_U[:, :p].double().T @ W_out.double()       # (p, d_mlp)
-    coef = basis @ V                                  # (n_basis, d_mlp)
-    E = coef ** 2
-    nch = max(ci.freqs)
-    char_E = np.zeros((W_out.shape[1], nch))
-    for k, rs in ci.by_char.items():
-        char_E[:, k - 1] = E[rs].sum(dim=0).cpu().numpy()
-    return char_E, char_E.argmax(axis=1) + 1
-
-
-def cluster_signal(model, ds, cluster_neurons, W_U_k):
-    """Cluster's projection onto the unembed's character-k direction over the
-    full (a, b) grid. Returns (p-1, p-1)."""
-    p = ds.p
-    aa, bb = torch.meshgrid(torch.arange(1, p), torch.arange(1, p), indexing="ij")
-    eq = torch.full_like(aa, ds.eq_token)
-    inputs = torch.stack([aa, bb, eq], dim=-1).reshape(-1, 3)
-    cache: dict[str, torch.Tensor] = {}
-    model.remove_all_hooks()
-    model.cache_all(cache)
-    with torch.no_grad():
-        _ = model(inputs)
-    model.remove_all_hooks()
-    h = cache["blocks.0.mlp.hook_post"][:, -1, :].double()
-    W_out = model.blocks[0].mlp.W_out.detach().double()
-    cluster_resid = h[:, cluster_neurons] @ W_out[:, cluster_neurons].T
-    sig = cluster_resid @ W_U_k.double()
-    return sig.reshape(p - 1, p - 1).cpu().numpy()
-
-
-def reference_cos_signal(k, p):
-    _, dlog = discrete_log_table(p)
-    a_dlog = np.array([dlog[a] for a in range(1, p)])
-    theta = 2 * np.pi * k * a_dlog / (p - 1)
-    return np.cos(theta[:, None] + theta[None, :])
+# Re-export from interp for back-compat with anything still importing here:
+from crypto_interp.interp.neurons import (  # noqa: F401
+    per_neuron_dominant_char,
+    cluster_signal,
+    reference_cos_signal,
+)
 
 
 def main():
@@ -73,24 +42,17 @@ def main():
     ap.add_argument("--out-prefix", type=str, default="neuron_clusters")
     args = ap.parse_args()
     run_dir = Path(args.run_dir).resolve()
-    ck = sorted(run_dir.glob("checkpoint_*.pt"))
-    if not ck:
-        raise SystemExit(f"No checkpoint in {run_dir}")
-    print(f"Loading {ck[-1]}")
-    model, ds, _ = load_run(ck[-1])
-    model.eval()
 
-    p = ds.p
-    basis, ci = char_index(p)
-    W_E = model.embed.W_E.detach()[:, :p].double()
-    W_U = model.unembed.W_U.detach()
-    W_out = model.blocks[0].mlp.W_out.detach()
+    S = Session.from_run(run_dir)
+    print(f"Loading {run_dir.name}")
+    p = S.ds.p
 
-    char_E_WE = char_energy(W_E, basis, ci)
-    K = sorted(k for k in ci.freqs if char_E_WE[k - 1] >= 0.05 * char_E_WE.max())
-    print(f"K = {K} (orders {[order_of(k, p) for k in K]}) — primitive root g={ci.g}")
+    # K via the 5%-energy threshold (matches the legacy behavior here).
+    char_E_WE = S.char_energy()
+    K = sorted(k for k in S.ci.freqs if char_E_WE[k - 1] >= 0.05 * char_E_WE.max())
+    print(f"K = {K} (orders {[order_of(k, p) for k in K]}) — primitive root g={S.ci.g}")
 
-    _, dom = per_neuron_dominant_char(W_U, W_out, basis, ci, p)
+    _, dom = S.per_neuron_dominant_char()
     _, dlog = discrete_log_table(p)
     order_idx = np.argsort([dlog[a] for a in range(1, p)])
 
@@ -99,13 +61,10 @@ def main():
         if len(cluster) == 0:
             print(f"  k={k}: no neurons in cluster (skip)")
             continue
-        cos_k = basis[ci.cos[k]]
-        W_U_k = W_U[:, :p].double() @ cos_k.double()
-        W_U_k = W_U_k / (W_U_k.norm() + 1e-12)
         print(f"  k={k} (order {order_of(k, p)}): {len(cluster)} neurons in cluster")
 
-        sig = cluster_signal(model, ds, cluster, W_U_k)
-        ref = reference_cos_signal(k, p)
+        sig = S.cluster_signal(k)
+        ref = S.reference_signal(k)
         sig_sorted = sig[order_idx][:, order_idx]
         ref_sorted = ref[order_idx][:, order_idx]
 

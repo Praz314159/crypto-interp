@@ -13,6 +13,7 @@ dependencies = [
     "numpy",
     "einops",
     "matplotlib",
+    "jaxtyping",
 ]
 
 [project.optional-dependencies]

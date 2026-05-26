@@ -96,11 +96,10 @@ def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
     and ``K`` is the set of characters with >= ``threshold`` x max W_E energy.
     """
     from .metrics import char_energy, order_of  # local import avoids import cycle
+    from .interventions import ablate_char_w   # local import: interventions depends on ablate
 
     p = ds.p
-    W_E = model.embed.W_E
-    W_E_orig = W_E.detach().clone()
-    W_val = W_E_orig[:, :p]
+    W_val = model.embed.W_E.detach()[:, :p]
     ce = char_energy(W_val, basis, ci)
     base = evaluate_loss(model, ds)[1]
     base_log = np.log10(base)
@@ -108,12 +107,8 @@ def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
 
     per_char: dict[int, dict] = {}
     for k in ci.freqs:
-        W_ab = ablate_character(W_val, basis, ci, k)
-        try:
-            W_E[:, :p] = W_ab.to(W_E.dtype)
+        with ablate_char_w(model, k, basis, ci):
             test_loss = evaluate_loss(model, ds)[1]
-        finally:
-            W_E.copy_(W_E_orig)
         dlog10 = float(np.log10(test_loss) - base_log)
         cls = "vestigial" if dlog10 < lo else ("load-bearing" if dlog10 < hi else "essential")
         per_char[k] = dict(energy=float(ce[k - 1]), ablated_loss=float(test_loss),

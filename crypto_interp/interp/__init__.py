@@ -5,7 +5,12 @@ Reusable building blocks only — experiment-specific analysis scripts live in
 """
 
 from .load import load_run, latest_checkpoint
-from .activations import cache_all, reshape_pp, summary
+from .activations import cache_all, reshape_pp, summary, run_with_cache
+from .cache import ActivationCache
+from .hooks import run_with_hooks, hooks, zero_hook, patch_hook, project_hook
+from .interventions import weight_patch, ablate_char_w, freeze_param
+from .patching import act_patch, patch_mlp_out, patch_resid_pre, patch_attn_out
+from .session import Session
 from .bases import (
     additive_fourier_basis,
     multiplicative_fourier_basis,
@@ -24,7 +29,13 @@ from .ablate import (
     ablate_character,
     essential_characters,
 )
-from .neurons import matched_bigrams, compute_per_neuron_frequency_energy
+from .neurons import (
+    matched_bigrams,
+    compute_per_neuron_frequency_energy,
+    per_neuron_dominant_char,
+    cluster_signal,
+    reference_cos_signal,
+)
 from .metrics import (
     per_frequency_energy_from_embedding,
     EmbeddingEnergyTracker,
@@ -44,8 +55,13 @@ from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs, help
 __all__ = [
     # load
     "load_run", "latest_checkpoint",
-    # activations
-    "cache_all", "reshape_pp", "summary",
+    # activations + cache + hooks
+    "cache_all", "reshape_pp", "summary", "run_with_cache",
+    "ActivationCache",
+    "run_with_hooks", "hooks", "zero_hook", "patch_hook", "project_hook",
+    "weight_patch", "ablate_char_w", "freeze_param",
+    "act_patch", "patch_mlp_out", "patch_resid_pre", "patch_attn_out",
+    "Session",
     # bases
     "additive_fourier_basis", "multiplicative_fourier_basis", "primitive_root",
     "discrete_log_table", "project_1d", "project_2d", "CharIndex", "char_index",
@@ -55,6 +71,7 @@ __all__ = [
     "essential_characters",
     # neurons
     "matched_bigrams", "compute_per_neuron_frequency_energy",
+    "per_neuron_dominant_char", "cluster_signal", "reference_cos_signal",
     # metrics
     "per_frequency_energy_from_embedding", "EmbeddingEnergyTracker",
     "char_energy", "char_energy_batch", "order_energy", "order_of",

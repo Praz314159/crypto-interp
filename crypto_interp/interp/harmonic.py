@@ -37,12 +37,10 @@ def delta_k(model, ds, ci: CharIndex, basis, k: int, *, logits_full=None) -> np.
     """Exact contribution of character k to the logits:
     ``logit_full - logit_ablated``, shape (p-1, p-1, vocab) as a numpy array.
     Pass ``logits_full`` (a torch grid) to avoid recomputing it across calls."""
-    p = ds.p
+    from .interventions import ablate_char_w
     full = compute_logits_grid(model, ds) if logits_full is None else logits_full
-    W_over = model.embed.W_E.detach().clone()
-    W_ab = ablate_character(model.embed.W_E.detach()[:, :p], basis, ci, k)
-    W_over[:, :p] = W_ab.to(W_over.dtype)
-    ablated = compute_logits_grid(model, ds, W_E_override=W_over)
+    with ablate_char_w(model, k, basis, ci):
+        ablated = compute_logits_grid(model, ds)
     return (full - ablated).cpu().numpy()
 
 
