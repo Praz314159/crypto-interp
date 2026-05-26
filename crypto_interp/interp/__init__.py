@@ -5,7 +5,9 @@ Reusable building blocks only — experiment-specific analysis scripts live in
 """
 
 from .load import load_run, latest_checkpoint
-from .activations import cache_all, reshape_pp, summary
+from .activations import cache_all, reshape_pp, summary, run_with_cache
+from .cache import ActivationCache
+from .hooks import run_with_hooks, hooks, zero_hook, patch_hook, project_hook
 from .bases import (
     additive_fourier_basis,
     multiplicative_fourier_basis,
@@ -44,8 +46,10 @@ from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs, help
 __all__ = [
     # load
     "load_run", "latest_checkpoint",
-    # activations
-    "cache_all", "reshape_pp", "summary",
+    # activations + cache + hooks
+    "cache_all", "reshape_pp", "summary", "run_with_cache",
+    "ActivationCache",
+    "run_with_hooks", "hooks", "zero_hook", "patch_hook", "project_hook",
     # bases
     "additive_fourier_basis", "multiplicative_fourier_basis", "primitive_root",
     "discrete_log_table", "project_1d", "project_2d", "CharIndex", "char_index",
