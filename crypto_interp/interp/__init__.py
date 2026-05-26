@@ -9,6 +9,7 @@ from .activations import cache_all, reshape_pp, summary, run_with_cache
 from .cache import ActivationCache
 from .hooks import run_with_hooks, hooks, zero_hook, patch_hook, project_hook
 from .interventions import weight_patch, ablate_char_w, freeze_param
+from .patching import act_patch, patch_mlp_out, patch_resid_pre, patch_attn_out
 from .session import Session
 from .bases import (
     additive_fourier_basis,
@@ -53,6 +54,7 @@ __all__ = [
     "ActivationCache",
     "run_with_hooks", "hooks", "zero_hook", "patch_hook", "project_hook",
     "weight_patch", "ablate_char_w", "freeze_param",
+    "act_patch", "patch_mlp_out", "patch_resid_pre", "patch_attn_out",
     "Session",
     # bases
     "additive_fourier_basis", "multiplicative_fourier_basis", "primitive_root",
