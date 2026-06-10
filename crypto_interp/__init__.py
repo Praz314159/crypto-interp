@@ -1,7 +1,6 @@
 """crypto_interp: mechanistic interpretability of cryptographic algorithms.
 
-See ``research_directions.md`` for the project's strategy doc. Top-level
-subpackages:
+Top-level subpackages:
 
   data       — task registry: (a, b) → tokenized Datasets for each task
   models     — Nanda-style 1-layer transformer with hook points
