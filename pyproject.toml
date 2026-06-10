@@ -21,7 +21,7 @@ dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
-exclude = ["experiments*", "scripts*", "notes*", "papers*"]
+exclude = ["experiments*", "scripts*", "notes*", "papers*", "infra*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
