@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+
+# Notes / manuscript — kept on disk only, not in git
+notes/
+
+# Research artifacts — hypotheses, findings, agenda; disk-only
+research_directions.md
+experiments/*/README.md
+experiments/*/scripts/README.md
+
+# Experiment outputs — regenerable, can be large
+experiments/*/runs/
+experiments/*/datasets/
+experiments/*/figures/
+experiments/*/data/
+
+# Analysis outputs at experiments/ root — regenerable, contain figures + CSVs
+experiments/lattice_variation/
+experiments/theory_trajectory*/
+experiments/noise_decomposition*/
+experiments/error_localization*/
+experiments/cross_prime_kernel_noise/
+
+# Drive-imported sweep archives — large, regeneratable on Colab
+imported_data/
+
+# Background-task / debug logs
+*.log
+
+# Reference material (PDFs, notebooks) — external sources, kept on disk only
+papers/
+*.ipynb
+
+# Local config
+.env
