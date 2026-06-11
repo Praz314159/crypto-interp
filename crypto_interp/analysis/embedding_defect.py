@@ -202,13 +202,133 @@ def plot_scatter(rows: list[dict], out_dir: Path) -> None:
     print(f"\nWrote {out}")
 
 
+# ---------------------------------------------------------------------------
+# Focused probes (per-run): plane zoom and causal geometric repair
+# ---------------------------------------------------------------------------
+
+def _setup_run(run_dir: str):
+    """Shared scaffold: session, errors, K, geometry fit, defect tokens."""
+    import torch
+    from collections import Counter
+    from crypto_interp.interp.grids import compute_logits_grid
+
+    S = Session.from_run(run_dir)
+    p = S.ds.p
+    n = p - 1
+    _, dl = discrete_log_table(p)
+    dlog = np.array([dl[x] for x in range(1, p)])
+    K = sorted(int(k) for k in S.essential()["K"])
+    W = S.model.embed.W_E.detach().double().numpy()[:, 1:p]
+    theta = TAU * np.outer(K, dlog) / n
+    Phi = np.concatenate([np.cos(theta), np.sin(theta)], 0)
+    B, *_ = np.linalg.lstsq(Phi.T, W.T, rcond=None)
+
+    def grid_wrong():
+        lg = compute_logits_grid(S.model, S.ds).detach().cpu().numpy()[..., :p]
+        a = np.arange(1, p)[:, None]
+        b = np.arange(1, p)[None, :]
+        wrong = lg.argmax(-1) != (a * b) % p
+        return int(wrong.sum()), np.maximum(wrong.mean(1), wrong.mean(0))
+
+    base_wrong, err = grid_wrong()
+    defect = [x for x in range(1, p) if err[x - 1] > 0.01]
+    # per-plane deviation z-scores and the modal implicated character
+    pd = np.zeros((len(K), n))
+    planes = []
+    for j, k in enumerate(K):
+        C, Sv = B[j], B[len(K) + j]
+        Q, _ = np.linalg.qr(np.stack([C, Sv], 1))
+        act = Q.T @ W
+        idl = Q.T @ (np.outer(C, np.cos(theta[j])) + np.outer(Sv, np.sin(theta[j])))
+        pd[j] = np.linalg.norm(act - idl, axis=0)
+        planes.append((C, Sv, Q))
+    z = pd / (np.median(pd, 1, keepdims=True) + 1e-12)
+    kstar = (K[Counter(int(z[:, x - 1].argmax()) for x in defect).most_common(1)[0][0]]
+             if defect else None)
+    return dict(S=S, p=p, n=n, dlog_map=dl, K=K, B=B, theta=theta,
+                planes=planes, z=z, kstar=kstar, defect=defect,
+                base_wrong=base_wrong, grid_wrong=grid_wrong, torch=torch)
+
+
+def zoom(run_dirs: list[str]) -> None:
+    """Per-plane z-scores of defect tokens on the implicated clock, and the
+    circular clustering R of their angles there (R→1: one arc)."""
+    for rd in run_dirs:
+        c = _setup_run(rd)
+        if not c["defect"]:
+            print(f"{Path(rd).name}: no errors")
+            continue
+        j = c["K"].index(c["kstar"])
+        zdef = sorted((float(c["z"][j, x - 1]) for x in c["defect"]), reverse=True)
+        ang = [TAU * c["kstar"] * c["dlog_map"][x] / c["n"] for x in c["defect"]]
+        R = abs(np.mean(np.exp(1j * np.array(ang))))
+        m = len(c["defect"])
+        print(f"{Path(rd).name} (p={c['p']}): k*={c['kstar']}, {m} defect tokens, "
+              f"wrong={c['base_wrong']}")
+        print(f"  plane-z on k*: {['%.1f' % v for v in zdef]}")
+        print(f"  angle clustering R={R:.2f} (null≈{0.886 / np.sqrt(m):.2f})")
+
+
+def repair(run_dirs: list[str], seed: int = 0) -> None:
+    """Causal test: replace tokens' in-plane coordinates on the implicated
+    clock with their fitted ideal positions; recount errors. Controls: the
+    same operation on random clean tokens, and on the entire clock."""
+    rng = np.random.default_rng(seed)
+    for rd in run_dirs:
+        c = _setup_run(rd)
+        if not c["defect"]:
+            print(f"{Path(rd).name}: no errors")
+            continue
+        S, torch = c["S"], c["torch"]
+        j = c["K"].index(c["kstar"])
+        C, Sv, Q = c["planes"][j]
+
+        def patched(tokens):
+            WE = S.model.embed.W_E.detach().double().numpy().copy()
+            for x in tokens:
+                w = WE[:, x]
+                ideal = (C * np.cos(c["theta"][j, x - 1])
+                         + Sv * np.sin(c["theta"][j, x - 1]))
+                WE[:, x] = w - Q @ (Q.T @ w) + Q @ (Q.T @ ideal)
+            return torch.tensor(WE, dtype=S.model.embed.W_E.dtype)
+
+        orig = S.model.embed.W_E.data.clone()
+        out = {}
+        clean = [x for x in range(1, c["p"]) if x not in c["defect"]]
+        variants = {
+            "repair defect tokens": c["defect"],
+            "patch random clean": list(rng.choice(clean, size=len(c["defect"]),
+                                                  replace=False)),
+            "straighten whole clock": list(range(1, c["p"])),
+        }
+        for lab, toks in variants.items():
+            S.model.embed.W_E.data = patched(toks)
+            out[lab], _ = c["grid_wrong"]()
+            S.model.embed.W_E.data = orig.clone()
+        print(f"{Path(rd).name}: k*=χ_{c['kstar']}, {len(c['defect'])} defect "
+              f"tokens, baseline wrong={c['base_wrong']}")
+        for lab, w in out.items():
+            print(f"    {lab:>24s}: wrong {c['base_wrong']} -> {w}")
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--mode", choices=["census", "zoom", "repair"],
+                    default="census")
+    ap.add_argument("--run-dirs", nargs="*", default=None,
+                    help="Run dirs for zoom/repair modes.")
     ap.add_argument("--out-dir", default="outputs/embedding_defect/all")
     args = ap.parse_args()
+
+    if args.mode == "zoom":
+        zoom(args.run_dirs or [])
+        return
+    if args.mode == "repair":
+        repair(args.run_dirs or [])
+        return
+
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
     rows = []
     for p, pattern in PRIME_RUNS.items():
         rows.extend(analyze_population(pattern, p))
