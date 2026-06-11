@@ -104,73 +104,117 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <title>__TITLE__</title>
 <style>
   :root {
-    --bg: #f6f6f4; --card: #ffffff; --border: #e6e4df;
-    --ink: #1c1c1a; --muted: #6b6b66; --accent: #2563eb;
-    --col-a: #2563eb; --col-b: #ea580c; --col-ans: #16a34a;
+    --paper: #faf9f6; --card: #fffefb; --hair: #e9e5dc; --ink: #1b1a17;
+    --body: #4a463f; --muted: #807a70; --accent: #4338ca;
+    --col-a: #2563eb; --col-b: #ea580c; --col-ans: #15803d;
     --col-warn: #dc2626;
+    --serif: "Iowan Old Style", "Palatino", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-         sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 60px; }
-  header h1 { font-size: 26px; font-weight: 650; margin: 0; letter-spacing: -0.3px; }
-  header .meta { color: var(--muted); font-size: 13.5px; margin-top: 6px;
-                 line-height: 1.6; }
-  header .meta b { color: var(--ink); font-weight: 600; }
-  .chip { display: inline-block; border: 1px solid var(--border);
-          background: var(--card); border-radius: 999px; padding: 1px 9px;
-          font-size: 12px; margin-right: 4px; }
-  .chip.helper { color: var(--muted); }
+  body { font-family: var(--sans); margin: 0; background: var(--paper);
+         color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 52px 30px 90px; }
 
-  .controls { position: sticky; top: 0; z-index: 5; background: var(--card);
-              border: 1px solid var(--border); border-radius: 12px;
-              padding: 12px 18px; margin: 20px 0 26px;
-              display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
-  .knob { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-  .knob .sym { font-weight: 650; font-size: 16px; }
+  .eyebrow { font: 600 11.5px var(--sans); letter-spacing: 0.16em;
+             text-transform: uppercase; color: var(--accent);
+             margin-bottom: 16px; }
+  header h1 { font: 600 42px/1.12 var(--serif); letter-spacing: -0.4px;
+              margin: 0 0 16px; max-width: 22ch; }
+  .lede { font: 400 17.5px/1.65 var(--serif); color: var(--body);
+          max-width: 64ch; margin: 0 0 22px; }
+  .lede b { font-weight: 600; color: var(--ink); }
+  .tok { font-family: var(--mono); font-weight: 700; font-size: 0.92em; }
+  .tok.a { color: var(--col-a); } .tok.b { color: var(--col-b); }
+  .tok.ans { color: var(--col-ans); }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: center;
+          font: 500 12.5px var(--sans); color: var(--muted);
+          padding: 16px 0; border-top: 1px solid var(--hair);
+          border-bottom: 1px solid var(--hair); }
+  .meta b { color: var(--ink); font-weight: 650; font-family: var(--mono); }
+  .chip { display: inline-flex; align-items: center; gap: 6px;
+          border: 1px solid var(--hair); background: var(--card);
+          border-radius: 999px; padding: 2.5px 11px;
+          font: 600 12px var(--mono); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chip.helper { color: var(--muted); font-weight: 500; }
+
+  .controls { position: sticky; top: 12px; z-index: 10; display: flex;
+              gap: 24px; align-items: center; flex-wrap: wrap;
+              background: rgba(255, 254, 251, 0.92);
+              backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+              border: 1px solid var(--hair); border-radius: 16px;
+              padding: 15px 22px; margin: 30px 0 44px;
+              box-shadow: 0 12px 32px rgba(45, 38, 20, 0.09); }
+  .knob { display: flex; align-items: center; gap: 9px; font-size: 14px; }
+  .knob .sym { font: 700 17px var(--mono); }
   .knob .sym.a { color: var(--col-a); } .knob .sym.b { color: var(--col-b); }
-  input[type=number] { width: 64px; font-size: 14px; padding: 3px 6px;
-                       border: 1px solid var(--border); border-radius: 6px; }
-  input[type=range] { width: 130px; accent-color: var(--accent); }
-  button { font-size: 13.5px; padding: 6px 14px; border-radius: 8px;
-           border: 1px solid var(--border); background: #fff; cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent);
-                   color: #fff; font-weight: 600; }
-  button:hover { filter: brightness(0.96); }
-  .result { font-size: 16px; font-weight: 650; }
+  input[type=number] { width: 66px; font: 600 14px var(--mono);
+                       padding: 4px 7px; border: 1px solid var(--hair);
+                       border-radius: 8px; background: #fff; color: var(--ink); }
+  input[type=range] { width: 132px; accent-color: var(--ink); }
+  button { font: 600 13.5px var(--sans); padding: 8px 16px;
+           border-radius: 10px; border: 1px solid var(--hair);
+           background: #fff; color: var(--ink); cursor: pointer;
+           transition: transform .06s ease, box-shadow .12s ease; }
+  button:hover { box-shadow: 0 2px 8px rgba(45,38,20,.12); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--ink); border-color: var(--ink);
+                   color: #fffefb; }
+  .result { font: 650 15.5px var(--mono); letter-spacing: -0.2px; }
   .result.ok { color: var(--col-ans); } .result.bad { color: var(--col-warn); }
-  .badge { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  .badge { font: 500 11.5px var(--sans); color: var(--muted);
+           margin-left: auto; text-align: right; }
 
-  .stage { background: var(--card); border: 1px solid var(--border);
-           border-radius: 14px; padding: 20px 24px 16px; margin-bottom: 22px; }
-  .stage h2 { font-size: 17px; font-weight: 650; margin: 0 0 6px;
-              display: flex; align-items: center; gap: 10px; }
-  .stage h2 .num { width: 24px; height: 24px; border-radius: 50%;
-                   background: var(--ink); color: #fff; font-size: 13px;
-                   display: inline-flex; align-items: center;
-                   justify-content: center; flex: none; }
-  .stage p.exp { color: var(--muted); font-size: 13.5px; line-height: 1.65;
-                 margin: 4px 0 14px; max-width: 860px; }
+  .stage { background: var(--card); border: 1px solid var(--hair);
+           border-radius: 18px; padding: 30px 34px 26px; margin-bottom: 30px;
+           box-shadow: 0 1px 3px rgba(45, 38, 20, 0.04); }
+  .stage h2 { font: 600 22.5px var(--serif); margin: 0 0 10px;
+              display: flex; align-items: center; gap: 14px;
+              letter-spacing: -0.2px; }
+  .stage h2 .num { width: 30px; height: 30px; border-radius: 50%;
+                   border: 1.5px solid var(--ink); color: var(--ink);
+                   font: 600 15px var(--serif); display: inline-flex;
+                   align-items: center; justify-content: center; flex: none; }
+  .stage p.exp { color: var(--body); font-size: 14px; line-height: 1.72;
+                 margin: 6px 0 22px; max-width: 80ch; }
   .stage p.exp b { color: var(--ink); font-weight: 600; }
-  .clock-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .clock-grid { display: flex; gap: 22px; flex-wrap: wrap; }
   .cell { text-align: center; }
-  .cell .lab { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
-  .cell .lab b { color: var(--ink); }
+  .cell .lab { font: 500 12px var(--mono); color: var(--muted);
+               margin-top: 7px; }
+  .cell .lab b { color: var(--ink); font-weight: 700; }
   canvas { display: block; }
-  .dyn { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .dyn { font: 500 13px var(--mono); color: var(--muted); margin-top: 16px;
+         padding-top: 12px; border-top: 1px dashed var(--hair); }
   .dyn b { color: var(--ink); }
   #coset-box, #wave-box { width: 100%; }
-  .legend { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .legend { font-size: 12.5px; color: var(--muted); }
   .swatch { display: inline-block; width: 10px; height: 10px;
-            border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+            border-radius: 3px; margin: 0 5px 0 12px; vertical-align: -1px; }
+  #tip { position: fixed; pointer-events: none; z-index: 50; display: none;
+         background: var(--ink); color: #fffefb; border-radius: 8px;
+         padding: 5px 10px; font: 600 12px var(--mono);
+         box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  footer { margin-top: 44px; color: var(--muted); font-size: 12.5px;
+           line-height: 1.7; border-top: 1px solid var(--hair);
+           padding-top: 16px; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header>
-  <h1>How a 1-layer transformer multiplies mod __P__</h1>
+  <div class="eyebrow">Mechanistic interpretability · live model dissection</div>
+  <h1>Watch a transformer multiply</h1>
+  <p class="lede">A 1-layer transformer trained on
+  <b>a × b mod __P__</b> doesn't memorize — it invents an algorithm:
+  represent every number as angles on a handful of clocks, <b>rotate</b> to
+  multiply, and let the clocks vote on the answer. The trained model is
+  embedded in this page and runs <b>live in your browser</b>; every figure
+  below is a real forward pass, recomputed as you change
+  <span class="tok a">a</span> and <span class="tok b">b</span>.</p>
   <div class="meta" id="meta"></div>
 </header>
 
@@ -253,7 +297,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="wave-box"><canvas id="waves"></canvas></div>
 </section>
 
+<footer id="foot"></footer>
+
 </div>
+<div id="tip"></div>
 <script>
 // PAYLOAD-BEGIN
 const P = __PAYLOAD__;
@@ -393,7 +440,7 @@ function makeCanvas(parent, w, h, label) {
   return cv;
 }
 
-const CW = 196;
+const CW = 216;
 const lookupCv = {}, addCv = {}, clusterCv = {};
 for (const k of P.K) {
   const role = isHelper(k)
@@ -420,24 +467,39 @@ function clockBase(cv, k) {
   const pts = geom[k].pts;
   let R = 0;
   for (const [u, v] of pts) R = Math.max(R, Math.hypot(u, v));
-  const sc = (CW / 2 - 14) / (R || 1), cx = CW / 2, cy = CW / 2;
-  c.strokeStyle = "#eeede9"; c.lineWidth = 1;
-  c.beginPath(); c.arc(cx, cy, (CW / 2 - 14), 0, TAU); c.stroke();
-  c.fillStyle = "#d4d2cc";
-  for (const [u, v] of pts) {
-    c.beginPath(); c.arc(cx + u * sc, cy - v * sc, 1.7, 0, TAU); c.fill();
+  const sc = (CW / 2 - 16) / (R || 1), cx = CW / 2, cy = CW / 2;
+  const ring = CW / 2 - 16;
+  // face: ring + cardinal ticks + center pin
+  c.strokeStyle = "#e9e5dc"; c.lineWidth = 1.2;
+  c.beginPath(); c.arc(cx, cy, ring, 0, TAU); c.stroke();
+  c.strokeStyle = "#dedacf";
+  for (let q = 0; q < 4; q++) {
+    const a = q * Math.PI / 2;
+    c.beginPath();
+    c.moveTo(cx + (ring - 4) * Math.cos(a), cy - (ring - 4) * Math.sin(a));
+    c.lineTo(cx + (ring + 3) * Math.cos(a), cy - (ring + 3) * Math.sin(a));
+    c.stroke();
   }
-  return {c, sc, cx, cy, R: CW / 2 - 14};
+  c.fillStyle = "#cfccc3";
+  for (const [u, v] of pts) {
+    c.beginPath(); c.arc(cx + u * sc, cy - v * sc, 1.8, 0, TAU); c.fill();
+  }
+  c.fillStyle = "#a8a499";
+  c.beginPath(); c.arc(cx, cy, 2.2, 0, TAU); c.fill();
+  cv._map = {k, sc, cx, cy};   // for hover inspection
+  return {c, sc, cx, cy, R: ring};
 }
 
 function hand(c, cx, cy, x, y, col, w, dash) {
   c.save();
-  c.strokeStyle = col; c.lineWidth = w;
+  c.strokeStyle = col; c.lineWidth = w; c.lineCap = "round";
   if (dash) c.setLineDash(dash);
   c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
   c.restore();
   c.fillStyle = col;
-  c.beginPath(); c.arc(x, y, w + 1.6, 0, TAU); c.fill();
+  c.beginPath(); c.arc(x, y, w + 1.7, 0, TAU); c.fill();
+  c.fillStyle = "#ffffff";
+  c.beginPath(); c.arc(x, y, Math.max(w - 1, 0.8), 0, TAU); c.fill();
 }
 
 function tokenXY(k, tok, sc, cx, cy) {
@@ -524,6 +586,13 @@ function drawCluster(k, t) {
     c.textAlign = "left";
     return;
   }
+  // resting spokes: every neuron's preferred phase, even when silent
+  c.strokeStyle = "#f0ede6"; c.lineWidth = 1;
+  for (let j = 0; j < idx.length; j++) {
+    c.beginPath(); c.moveTo(cx, cy);
+    c.lineTo(cx + R * Math.cos(-phi[j]), cy + R * Math.sin(-phi[j]));
+    c.stroke();
+  }
   let amax = 1e-9;
   for (const i of idx) amax = Math.max(amax, fwd.mlpPost[i]);
   c.fillStyle = charColor[k] + "c0";
@@ -579,8 +648,12 @@ function drawCosets(t) {
     c.font = "11px sans-serif"; c.fillStyle = "#9c9a94";
     c.fillText(`keeps ${gcd(k, n)}`, 44, y + 15);
     for (let i = 0; i < n; i++) {
-      c.fillStyle = sv[i] ? charColor[k] : "#efeeea";
-      c.fillRect(padL + i * cellW, y, Math.max(cellW - 1, 1), rowH - 9);
+      c.fillStyle = sv[i] ? charColor[k] : "#f0ede6";
+      c.beginPath();
+      if (c.roundRect) c.roundRect(padL + i * cellW, y,
+                                   Math.max(cellW - 1.2, 1), rowH - 9, 2);
+      else c.rect(padL + i * cellW, y, Math.max(cellW - 1.2, 1), rowH - 9);
+      c.fill();
     }
   });
   const yI = 8 + P.K.length * rowH + 6;
@@ -589,9 +662,22 @@ function drawCosets(t) {
     c.fillText("∩ all", 8, yI + 15);
     let count = 0;
     for (let i = 0; i < n; i++) {
-      c.fillStyle = inter[i] ? COL.ans : "#efeeea";
-      if (inter[i]) count++;
-      c.fillRect(padL + i * cellW, yI, Math.max(cellW - 1, 1), rowH - 9);
+      if (inter[i]) {
+        count++;
+        c.save();
+        c.shadowColor = COL.ans; c.shadowBlur = 9;
+        c.fillStyle = COL.ans;
+        c.fillRect(padL + i * cellW - 1, yI - 2,
+                   Math.max(cellW + 0.8, 3), rowH - 5);
+        c.restore();
+      } else {
+        c.fillStyle = "#f0ede6";
+        c.beginPath();
+        if (c.roundRect) c.roundRect(padL + i * cellW, yI,
+                                     Math.max(cellW - 1.2, 1), rowH - 9, 2);
+        else c.rect(padL + i * cellW, yI, Math.max(cellW - 1.2, 1), rowH - 9);
+        c.fill();
+      }
     }
     c.font = "11px sans-serif"; c.fillStyle = "#9c9a94";
     c.fillText(`${count} left`, 44, yI + 15);
@@ -639,9 +725,11 @@ function drawWaves(t) {
     let wmax = 1e-9;
     for (let i = 0; i < n; i++) wmax = Math.max(wmax, Math.abs(w[i]));
     const y0 = lane * (j + 0.75);
-    line(w, y0, lane * 0.4 / wmax, charColor[P.K[j]], 1.1);
+    c.strokeStyle = "#f0ede6"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(padL, y0); c.lineTo(W - padR, y0); c.stroke();
+    line(w, y0, lane * 0.4 / wmax, charColor[P.K[j]], 1.2);
     c.fillStyle = charColor[P.K[j]];
-    c.font = "600 11.5px sans-serif"; c.textAlign = "left";
+    c.font = "700 11.5px ui-monospace, Menlo, monospace"; c.textAlign = "left";
     c.fillText("χ_" + P.K[j], 4, y0 + 4);
   });
   let span = 1e-9;
@@ -650,10 +738,20 @@ function drawWaves(t) {
   const y0 = lane * (P.K.length + 1.35), amp = lane * 1.15 / span;
   const act = new Float64Array(n);
   for (let i = 0; i < n; i++) act[i] = logits[byDlog[i]] - Lmean;
-  line(act, y0, amp, "#b9b7b1", 1);
-  line(total, y0, amp, "#111", 1.5);
-  c.fillStyle = "#111"; c.font = "600 11.5px sans-serif";
+  c.strokeStyle = "#f0ede6"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(padL, y0); c.lineTo(W - padR, y0); c.stroke();
+  line(act, y0, amp, "#bcb8b0", 1);
+  line(total, y0, amp, "#15140f", 1.6);
+  c.fillStyle = "#15140f";
+  c.font = "700 12px ui-monospace, Menlo, monospace";
   c.fillText("Σ", 14, y0 + 4);
+  // dot on the spike once the draw has reached it
+  let iPk = 0;
+  for (let i = 1; i < n; i++) if (total[i] > total[iPk]) iPk = i;
+  if (iPk < iMax) {
+    c.fillStyle = COL.ans;
+    c.beginPath(); c.arc(xs(iPk), y0 - total[iPk] * amp, 3.6, 0, TAU); c.fill();
+  }
   const xAns = xs((P.dlog[A] + P.dlog[B]) % n);
   c.strokeStyle = COL.ans; c.lineWidth = 1.4; c.setLineDash([6, 4]);
   c.beginPath(); c.moveTo(xAns, 6); c.lineTo(xAns, H - 16); c.stroke();
@@ -712,16 +810,53 @@ function walkthrough() {
   anim = requestAnimationFrame(frame);
 }
 
-// meta line
+// meta line + footer
 {
-  const chips = P.K.map(k => isHelper(k)
-    ? `<span class="chip helper">χ_${k} = 2·χ_${P.helpers[k]} (helper)</span>`
-    : `<span class="chip">χ_${k} primary</span>`).join(" ");
+  const chips = P.K.map(k => {
+    const dot = `<span class="dot" style="background:${charColor[k]}"></span>`;
+    return isHelper(k)
+      ? `<span class="chip helper">${dot}χ_${k} = 2·χ_${P.helpers[k]}</span>`
+      : `<span class="chip">${dot}χ_${k}</span>`;
+  }).join(" ");
   $("meta").innerHTML =
-    `The trained model runs <b>live in this page</b> (forward pass ported to ` +
-    `JavaScript). p = <b>${p}</b>, primitive root g = <b>${P.g}</b>, ` +
-    `d_model = ${P.cfg.d_model}, d_mlp = ${P.cfg.d_mlp}. ` +
-    `Characters in use: ${chips}`;
+    `<span>p = <b>${p}</b></span>` +
+    `<span>primitive root g = <b>${P.g}</b></span>` +
+    `<span>d_model = <b>${P.cfg.d_model}</b></span>` +
+    `<span>d_mlp = <b>${P.cfg.d_mlp}</b></span>` +
+    `<span>characters: ${chips}</span>`;
+  $("foot").innerHTML =
+    `Model: 1-layer attention + ReLU MLP transformer (no LayerNorm), trained ` +
+    `to grok modular multiplication. The page is fully self-contained — the ` +
+    `weights are embedded and the forward pass runs in JavaScript, verified ` +
+    `against PyTorch on load. Hover any gray dot on a clock to identify its ` +
+    `token. Built with the crypto_interp library.`;
+}
+
+// hover inspection on clock faces: identify the token under the cursor
+{
+  const tip = $("tip");
+  const attach = cv => cv.addEventListener("mousemove", ev => {
+    const m = cv._map;
+    if (!m) return;
+    const r = cv.getBoundingClientRect();
+    const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    let best = -1, bd = 144; // 12px snap radius
+    const pts = geom[m.k].pts;
+    for (let t = 1; t < p; t++) {
+      const dx = m.cx + pts[t - 1][0] * m.sc - mx;
+      const dy = m.cy - pts[t - 1][1] * m.sc - my;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; best = t; }
+    }
+    if (best > 0) {
+      tip.style.display = "block";
+      tip.style.left = (ev.clientX + 14) + "px";
+      tip.style.top = (ev.clientY - 10) + "px";
+      tip.textContent = `token ${best} · dlog ${P.dlog[best]}`;
+    } else tip.style.display = "none";
+  });
+  for (const k of P.K) { attach(lookupCv[k]); attach(addCv[k]); }
+  document.addEventListener("mouseout", () => tip.style.display = "none");
 }
 
 for (const [id, set] of [["in-a", v => A = v], ["sl-a", v => A = v],
@@ -737,7 +872,7 @@ $("step").addEventListener("click", () => { B = (B * P.g) % p; walkthrough(); })
 $("play").addEventListener("click", walkthrough);
 window.addEventListener("resize", () => {
   sizeWide($("cosets"), 8 + (P.K.length + 1) * 30 + 24);
-  sizeWide($("waves"), 300);
+  sizeWide($("waves"), 330);
   renderAll();
 });
 
@@ -756,7 +891,7 @@ window.addEventListener("resize", () => {
 })();
 
 sizeWide($("cosets"), 8 + (P.K.length + 1) * 30 + 24);
-sizeWide($("waves"), 300);
+sizeWide($("waves"), 330);
 renderAll();
 walkthrough();
 </script>
