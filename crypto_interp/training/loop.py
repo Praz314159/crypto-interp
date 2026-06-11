@@ -8,6 +8,10 @@ float64 cross-entropy.
 
 from __future__ import annotations
 
+import datetime
+import json
+import socket
+import subprocess
 import time
 from pathlib import Path
 
@@ -23,6 +27,25 @@ from .config import ExperimentConfig
 
 
 # ----------------------------- helpers -----------------------------
+
+def _write_manifest(run_dir: Path, cfg: ExperimentConfig, device) -> None:
+    """Record run provenance so it never has to be reconstructed from mtimes."""
+    try:
+        git_sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip() or None
+    except Exception:
+        git_sha = None
+    manifest = {
+        "config": cfg.to_checkpoint_dict(),
+        "device": str(device),
+        "hostname": socket.gethostname(),
+        "git_sha": git_sha,
+        "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
+
 
 def cross_entropy_high_precision(
     logits: torch.Tensor,
@@ -133,6 +156,7 @@ def train(
     np.random.seed(cfg.seed)
 
     device = pick_device(cfg.device)
+    _write_manifest(run_dir, cfg, device)
     use_float64 = device.type != "mps"
     print(f"Device: {device}, high-precision (float64) loss: {use_float64}")
     if not use_float64:

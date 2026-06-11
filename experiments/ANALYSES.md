@@ -197,6 +197,15 @@ pairs = find_primary_helper_pairs(model, ds, ci, basis, K)  # (helper, primary, 
 
 ## Cleanup candidates (ad-hoc ≈ superseded by canonical)
 
+> **Update 2026-06-10:** the superseded scripts in the table below (plus
+> `001/analyze_always_firing.py`, `003/viz_basis_dynamics.py`,
+> `003/viz_order_energy_evolution.py`, and the §4 signal-decomposition
+> trio) have been **deleted from the working tree** — they are preserved
+> in the private archive repo's history. The remaining ad-hoc scripts
+> (§6, §8–§13) have no canonical equivalent yet and stay until the
+> library grows replacements. Analysis outputs now live under
+> `outputs/<analysis>/<experiment-id>/`, not at the `experiments/` root.
+
 These predate the `crypto_interp` extraction and largely duplicate canonical
 logic; prefer the canonical module, migrate or delete the ad-hoc one:
 

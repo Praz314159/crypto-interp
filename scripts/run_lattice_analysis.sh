@@ -24,8 +24,8 @@ python -m scripts.import_drive_sweep --drive "$DRIVE_PATH" --repo-root "$REPO_RO
 echo
 echo "=== [2/2] running lattice_variation analysis ==="
 python -m crypto_interp.analysis.lattice_variation \
-    --out-dir "$REPO_ROOT/experiments/lattice_variation"
+    --out-dir "$REPO_ROOT/outputs/lattice_variation/all"
 
 echo
-echo "Done. Results in experiments/lattice_variation/"
-ls -la "$REPO_ROOT/experiments/lattice_variation/"
+echo "Done. Results in outputs/lattice_variation/all/"
+ls -la "$REPO_ROOT/outputs/lattice_variation/all/"

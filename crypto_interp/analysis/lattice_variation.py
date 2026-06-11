@@ -14,7 +14,7 @@ Tests two predictions from ``playbooks/lattice_variation.md``:
 
 Usage:
     python -m crypto_interp.analysis.lattice_variation \\
-        --out-dir experiments/lattice_variation/
+        --out-dir outputs/lattice_variation/all/
 """
 from __future__ import annotations
 
@@ -272,7 +272,7 @@ def _hist_counts(values, bins):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-dir", default="experiments/lattice_variation",
+    ap.add_argument("--out-dir", default="outputs/lattice_variation/all",
                     help="Where to write the summary CSV + figures.")
     ap.add_argument("--no-plots", action="store_true",
                     help="Skip figure generation (CSV only).")

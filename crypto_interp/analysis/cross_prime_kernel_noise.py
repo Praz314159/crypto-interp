@@ -10,7 +10,7 @@ and predicted floor vs observed L_sym for non-grokked runs.
 
 Usage:
     python -m crypto_interp.analysis.cross_prime_kernel_noise \\
-        --out-dir experiments/cross_prime_kernel_noise
+        --out-dir outputs/cross_prime_kernel_noise/all
 """
 from __future__ import annotations
 
@@ -124,7 +124,7 @@ def analyze_one(run_dir: Path) -> dict | None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-dir", default="experiments/cross_prime_kernel_noise")
+    ap.add_argument("--out-dir", default="outputs/cross_prime_kernel_noise/all")
     args = ap.parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

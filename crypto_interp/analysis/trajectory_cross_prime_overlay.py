@@ -8,11 +8,11 @@ complement to the per-prime grid plots from trajectory_population_plot.py.
 
 Usage:
     python -m crypto_interp.analysis.trajectory_cross_prime_overlay \\
-        --in-dirs experiments/theory_trajectory \\
-                  experiments/theory_trajectory_p127 \\
-                  experiments/theory_trajectory_p181 \\
+        --in-dirs outputs/theory_trajectory/003_dmodel_sweep_p113 \\
+                  outputs/theory_trajectory/004_p127 \\
+                  outputs/theory_trajectory/005_p181 \\
         --primes 113 127 181 \\
-        --out-file experiments/theory_trajectory/cross_prime_overlay.png
+        --out-file outputs/theory_trajectory/003_dmodel_sweep_p113/cross_prime_overlay.png
 """
 from __future__ import annotations
 

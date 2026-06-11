@@ -352,7 +352,7 @@ def main():
     ap.add_argument("--runs-root", default="experiments/003_dmodel_sweep_p113/runs")
     ap.add_argument("--tag", default="dmodel_24_dmlp_20_wd2")
     ap.add_argument("--seeds", nargs="+", type=int, default=None)
-    ap.add_argument("--out-dir", default="experiments/noise_decomposition")
+    ap.add_argument("--out-dir", default="outputs/noise_decomposition/003_dmodel_sweep_p113")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)

@@ -7,15 +7,15 @@ labels, color-coded by outcome.
 Usage:
     # One prime per output PNG, large panels:
     python -m crypto_interp.analysis.trajectory_population_plot \\
-        --in-dir experiments/theory_trajectory \\
-        --out-file experiments/theory_trajectory/population_p113.png \\
+        --in-dir outputs/theory_trajectory/003_dmodel_sweep_p113 \\
+        --out-file outputs/theory_trajectory/003_dmodel_sweep_p113/population_p113.png \\
         --title "p = 113, d_mlp = 20, wd = 2"
 
     # Combined view across primes:
     python -m crypto_interp.analysis.trajectory_population_plot \\
-        --in-dir experiments/theory_trajectory experiments/theory_trajectory_p127 experiments/theory_trajectory_p181 \\
+        --in-dir outputs/theory_trajectory/003_dmodel_sweep_p113 outputs/theory_trajectory/004_p127 outputs/theory_trajectory/005_p181 \\
         --prime-labels 113 127 181 \\
-        --out-file experiments/theory_trajectory/all_primes.png \\
+        --out-file outputs/theory_trajectory/003_dmodel_sweep_p113/all_primes.png \\
         --title "Trajectories across primes"
 """
 from __future__ import annotations

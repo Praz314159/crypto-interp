@@ -23,7 +23,7 @@ Usage:
         --seeds 7 8 10 12 9 13 14 \\
         --runs-root experiments/003_dmodel_sweep_p113/runs \\
         --tag dmodel_24_dmlp_20_wd2 \\
-        --out-dir experiments/error_localization
+        --out-dir outputs/error_localization/003_dmodel_sweep_p113
 """
 from __future__ import annotations
 
@@ -309,7 +309,7 @@ def main():
     ap.add_argument("--seeds", nargs="+", type=int, required=True)
     ap.add_argument("--runs-root", default="experiments/003_dmodel_sweep_p113/runs")
     ap.add_argument("--tag", default="dmodel_24_dmlp_20_wd2")
-    ap.add_argument("--out-dir", default="experiments/error_localization")
+    ap.add_argument("--out-dir", default="outputs/error_localization/003_dmodel_sweep_p113")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)

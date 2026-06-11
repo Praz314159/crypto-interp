@@ -19,7 +19,7 @@ Or for a small population (figures saved to --out-dir):
         --seeds 7 8 10 11 12 13 14 15 \\
         --runs-root experiments/003_dmodel_sweep_p113/runs \\
         --tag dmodel_24_dmlp_20_wd2 \\
-        --out-dir experiments/theory_trajectory
+        --out-dir outputs/theory_trajectory/003_dmodel_sweep_p113
 """
 from __future__ import annotations
 
@@ -123,7 +123,7 @@ def main():
                     help="Run-name prefix; full name = '{tag}_seed{N}'.")
     ap.add_argument("--seeds", nargs="+", type=int, default=None,
                     help="Seed numbers to plot.")
-    ap.add_argument("--out-dir", default="experiments/theory_trajectory",
+    ap.add_argument("--out-dir", default="outputs/theory_trajectory/003_dmodel_sweep_p113",
                     help="Where to save figures and CSVs.")
     args = ap.parse_args()
 

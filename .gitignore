@@ -31,12 +31,9 @@ experiments/*/datasets/
 experiments/*/figures/
 experiments/*/data/
 
-# Analysis outputs at experiments/ root — regenerable, contain figures + CSVs
-experiments/lattice_variation/
-experiments/theory_trajectory*/
-experiments/noise_decomposition*/
-experiments/error_localization*/
-experiments/cross_prime_kernel_noise/
+# Analysis outputs — regenerable figures/CSVs/npz, organized as
+# outputs/<analysis>/<experiment-id-or-"all">/
+outputs/
 
 # Drive-imported sweep archives — large, regeneratable on Colab
 imported_data/
