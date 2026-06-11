@@ -43,6 +43,10 @@ train_one() {
     local tag="dmodel_24_dmlp_32_seed${seed}"
     local logf="/tmp/traj_sweep_${exp}_seed${seed}.log"
     local t0=$(date +%s)
+    # A partial dir is disposable by policy: clear any leftover checkpoints
+    # so the retrain never merges with a previous run's files.
+    rm -f "experiments/${exp}/runs/${tag}"/checkpoint_*.pt \
+          "experiments/${exp}/runs/${tag}"/manifest.json
     OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
     python -m scripts.train \
         --experiment "$exp" \
