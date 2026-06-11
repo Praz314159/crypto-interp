@@ -1,19 +1,24 @@
-"""Export a self-contained interactive HTML viewer of the learned algorithm.
+"""Export a self-contained interactive HTML walkthrough of the learned algorithm.
 
 The model is small enough to run its entire forward pass in the browser, so
 the page embeds the weights as JSON plus a faithful JavaScript port of the
 forward pass (verified on load against reference logits computed here in
-PyTorch). Sliders pick (a, b); every panel recomputes live:
+PyTorch).
 
-  - clocks: token embeddings in each essential character's 2D plane of W_E,
-    with hands at a, b, and a·b
-  - attention pattern at the '=' position
-  - phased arrays: each character cluster's neurons at their preferred phase,
-    bar length = actual activation; the bump points at θ_k(a) + θ_k(b)
-  - interference: the live logits decomposed per character over candidates in
-    dlog order; the per-character waves are coset-ambiguous, their sum spikes
-    at c = a·b
-  - "animate" steps b ← g·b so multiplication becomes uniform rotation
+The page is a five-stage narrative mirroring the computation, each stage an
+animated demonstration of one step of the algorithm:
+
+  1. Look up the angles — each token's position on the K character clocks
+     (W_E projected onto each character plane).
+  2. Add the angles — the green hand rotates from θ_k(a) by θ_k(b) and lands
+     on the stored embedding of a·b; helpers shown as double-speed copies.
+  3. Clusters detect the sum — each character's neurons at their preferred
+     phase; the activation bump points at θ_k(a)+θ_k(b).
+  4. Characters vote cosets — χ_k cannot distinguish gcd(k, p−1) candidates;
+     the strips show each character's surviving candidates and their
+     single-point intersection (the approximate-CRT step).
+  5. Interference — per-character logit waves sum to a spike at c = a·b,
+     overlaid on the model's actual logits.
 
 Usage:
     python -m crypto_interp.analysis.inference_viewer_web \\
@@ -95,70 +100,175 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
 <style>
-  body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 18px;
-         background: #fafafa; color: #222; }
-  h1 { font-size: 20px; margin: 0 0 2px 0; }
-  .sub { color: #777; font-size: 13px; margin-bottom: 12px; }
-  .controls { display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
-              background: #fff; border: 1px solid #ddd; border-radius: 8px;
-              padding: 10px 14px; margin-bottom: 14px; }
-  .controls label { font-size: 13px; }
-  .controls input[type=number] { width: 64px; }
-  .result { font-size: 16px; font-weight: 600; }
-  .ok { color: #2a7d2a; } .bad { color: #c33; }
-  .badge { font-size: 11px; color: #666; margin-left: auto; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-  .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px;
-           padding: 6px; text-align: center; }
-  .panel .cap { font-size: 11.5px; color: #444; margin-top: 2px; }
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --border: #e6e4df;
+    --ink: #1c1c1a; --muted: #6b6b66; --accent: #2563eb;
+    --col-a: #2563eb; --col-b: #ea580c; --col-ans: #16a34a;
+    --col-warn: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+         sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 60px; }
+  header h1 { font-size: 26px; font-weight: 650; margin: 0; letter-spacing: -0.3px; }
+  header .meta { color: var(--muted); font-size: 13.5px; margin-top: 6px;
+                 line-height: 1.6; }
+  header .meta b { color: var(--ink); font-weight: 600; }
+  .chip { display: inline-block; border: 1px solid var(--border);
+          background: var(--card); border-radius: 999px; padding: 1px 9px;
+          font-size: 12px; margin-right: 4px; }
+  .chip.helper { color: var(--muted); }
+
+  .controls { position: sticky; top: 0; z-index: 5; background: var(--card);
+              border: 1px solid var(--border); border-radius: 12px;
+              padding: 12px 18px; margin: 20px 0 26px;
+              display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+  .knob { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .knob .sym { font-weight: 650; font-size: 16px; }
+  .knob .sym.a { color: var(--col-a); } .knob .sym.b { color: var(--col-b); }
+  input[type=number] { width: 64px; font-size: 14px; padding: 3px 6px;
+                       border: 1px solid var(--border); border-radius: 6px; }
+  input[type=range] { width: 130px; accent-color: var(--accent); }
+  button { font-size: 13.5px; padding: 6px 14px; border-radius: 8px;
+           border: 1px solid var(--border); background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent);
+                   color: #fff; font-weight: 600; }
+  button:hover { filter: brightness(0.96); }
+  .result { font-size: 16px; font-weight: 650; }
+  .result.ok { color: var(--col-ans); } .result.bad { color: var(--col-warn); }
+  .badge { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+
+  .stage { background: var(--card); border: 1px solid var(--border);
+           border-radius: 14px; padding: 20px 24px 16px; margin-bottom: 22px; }
+  .stage h2 { font-size: 17px; font-weight: 650; margin: 0 0 6px;
+              display: flex; align-items: center; gap: 10px; }
+  .stage h2 .num { width: 24px; height: 24px; border-radius: 50%;
+                   background: var(--ink); color: #fff; font-size: 13px;
+                   display: inline-flex; align-items: center;
+                   justify-content: center; flex: none; }
+  .stage p.exp { color: var(--muted); font-size: 13.5px; line-height: 1.65;
+                 margin: 4px 0 14px; max-width: 860px; }
+  .stage p.exp b { color: var(--ink); font-weight: 600; }
+  .clock-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .cell { text-align: center; }
+  .cell .lab { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .cell .lab b { color: var(--ink); }
   canvas { display: block; }
-  #wave-panel { width: 100%; }
+  .dyn { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .dyn b { color: var(--ink); }
+  #coset-box, #wave-box { width: 100%; }
+  .legend { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .swatch { display: inline-block; width: 10px; height: 10px;
+            border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
 </style>
 </head>
 <body>
-<h1>__TITLE__</h1>
-<div class="sub">Every panel recomputes a real forward pass of the trained
-model, in your browser, in the multiplicative character basis.</div>
+<div class="wrap">
+
+<header>
+  <h1>How a 1-layer transformer multiplies mod __P__</h1>
+  <div class="meta" id="meta"></div>
+</header>
 
 <div class="controls">
-  <label>a <input id="in-a" type="number" min="1"> </label>
-  <input id="sl-a" type="range" min="1" style="width:140px">
-  <label>b <input id="in-b" type="number" min="1"> </label>
-  <input id="sl-b" type="range" min="1" style="width:140px">
-  <button id="step">b ← g·b</button>
-  <button id="anim">▶ animate</button>
+  <div class="knob"><span class="sym a">a</span>
+    <input id="in-a" type="number" min="1">
+    <input id="sl-a" type="range" min="1"></div>
+  <div class="knob"><span class="sym b">b</span>
+    <input id="in-b" type="number" min="1">
+    <input id="sl-b" type="range" min="1"></div>
+  <button class="primary" id="play">▶ replay walkthrough</button>
+  <button id="step" title="multiply b by the primitive root g — the algorithm's unit step">b ← g·b</button>
   <span class="result" id="result"></span>
   <span class="badge" id="badge">checking forward pass…</span>
 </div>
 
-<div class="row" id="clock-row"></div>
-<div class="row" id="cluster-row"></div>
-<div class="row"><div class="panel" id="wave-panel">
-  <canvas id="waves"></canvas>
-  <div class="cap">per-character logit waves over candidates c (dlog order)
-  — each is coset-ambiguous; the sum (black) spikes at c = a·b (green line).
-  Gray: actual logits.</div>
-</div></div>
+<section class="stage">
+  <h2><span class="num">1</span>Look up the angles</h2>
+  <p class="exp">The embedding stores every token as a position on
+  <b>__NK__ clocks</b> — one per character χ<sub>k</sub> the model learned to
+  use. Token x sits at angle θ<sub>k</sub>(x) = 2πk·dlog(x)/(p−1), where dlog
+  is the discrete logarithm base g=__G__. Each circle below is the actual
+  embedding matrix W<sub>E</sub> projected onto one character's plane; gray
+  dots are all p−1 tokens. The model "reads" <b style="color:var(--col-a)">a</b>
+  and <b style="color:var(--col-b)">b</b> by looking up their hands.</p>
+  <div class="clock-grid" id="row-lookup"></div>
+  <div class="dyn" id="dyn-lookup"></div>
+</section>
 
+<section class="stage">
+  <h2><span class="num">2</span>Add the angles — this is the multiplication</h2>
+  <p class="exp">Multiplying numbers is <b>adding their discrete logs</b>, and
+  adding logs is <b>rotating a clock hand</b>. Watch the
+  <b style="color:var(--col-ans)">green hand</b> start at a's angle and rotate
+  by b's angle: it lands exactly on the gray dot where the embedding stores
+  a·b — on every clock at once. A <b>helper</b> character χ<sub>2m</sub> is
+  the same motion at double speed: it reuses χ<sub>m</sub>'s machinery and
+  costs the model nothing extra (the dashed green hand is the primary's angle
+  doubled — it coincides with the helper's own hand).</p>
+  <div class="clock-grid" id="row-add"></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">3</span>Neuron clusters detect the summed angle</h2>
+  <p class="exp">In the MLP, each <b>primary</b> character owns a small
+  cluster of ReLU neurons, each tuned to a preferred phase — its position
+  around the circle below. Bar length is that neuron's <b>actual activation
+  on this forward pass</b>. The active bump always points at
+  θ<sub>k</sub>(a)+θ<sub>k</sub>(b) (red line; the dashed mirror exists
+  because a real cos/sin basis cannot tell k from −k). Helper characters have
+  <b>zero neurons of their own</b> — the ReLU's second harmonic produces their
+  signal from the primary's bump for free.</p>
+  <div class="clock-grid" id="row-cluster"></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">4</span>Each character votes for a coset — the CRT step</h2>
+  <p class="exp">One clock cannot name the answer. Character χ<sub>k</sub>
+  only measures angles at frequency k, so every candidate c with the same
+  k·dlog(c) looks identical to it: exactly <b>gcd(k, p−1) candidates</b>
+  survive each character's vote (colored cells below; candidates ordered by
+  dlog). The algorithm works because the surviving sets of different
+  characters <b>intersect in a single candidate</b> — the model's
+  approximate Chinese-Remainder argument. This is why it must learn several
+  characters whose frequencies jointly cover p−1, and why a seed whose K
+  fails to cover (like the CRT-failure regime) cannot reach zero loss.</p>
+  <div id="coset-box"><canvas id="cosets"></canvas></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">5</span>Interference turns votes into logits</h2>
+  <p class="exp">The unembed converts each character's vote into a cosine
+  wave over all candidates: peaks on the character's surviving coset. The
+  waves are individually ambiguous, but their <b>sum spikes only at
+  c = a·b</b> — constructive interference exactly where every character
+  agrees. <span class="legend"><span class="swatch" style="background:#999"></span>actual
+  model logits <span class="swatch" style="background:#000"></span>sum of the K
+  character waves <span class="swatch" style="background:var(--col-ans)"></span>true
+  answer</span></p>
+  <div id="wave-box"><canvas id="waves"></canvas></div>
+</section>
+
+</div>
 <script>
 // PAYLOAD-BEGIN
 const P = __PAYLOAD__;
 // PAYLOAD-END
 // CORE-BEGIN
 function runForward(P, a, b) {
-  const {d_model, d_mlp, num_heads, d_head, n_ctx} = P.cfg;
+  const {d_model, d_mlp, num_heads, d_head} = P.cfg;
   const toks = [a, b, P.eq];
-  // embed + pos
   const x = [];
   for (let t = 0; t < 3; t++) {
     const v = new Float64Array(d_model);
     for (let d = 0; d < d_model; d++) v[d] = P.W_E[d][toks[t]] + P.W_pos[t][d];
     x.push(v);
   }
-  // attention
-  const attn = [];           // [head][key] at query t=2
+  const attn = [];
   const zflat = new Float64Array(num_heads * d_head);
   for (let h = 0; h < num_heads; h++) {
     const q = new Float64Array(d_head), k = [], v = [];
@@ -201,7 +311,6 @@ function runForward(P, a, b) {
     for (let f = 0; f < zflat.length; f++) s += P.W_O[d][f] * zflat[f];
     residMid[d] = x[2][d] + s;
   }
-  // MLP
   const mlpPost = new Float64Array(d_mlp);
   for (let m = 0; m < d_mlp; m++) {
     let s = P.b_in[m];
@@ -214,7 +323,6 @@ function runForward(P, a, b) {
     for (let m = 0; m < d_mlp; m++) s += P.W_out[d][m] * mlpPost[m];
     residPost[d] = residMid[d] + s;
   }
-  // unembed (value tokens only)
   const logits = new Float64Array(P.p);
   for (let c = 0; c < P.p; c++) {
     let s = 0;
@@ -225,17 +333,26 @@ function runForward(P, a, b) {
 }
 // CORE-END
 
-// ----------------------------- UI ---------------------------------------
-const p = P.p, n = P.p - 1;
-const COL = {a: "#1f77b4", b: "#ff7f0e", ans: "#2ca02c"};
-let A = 7 % p || 1, B = 12 % p || 2, timer = null;
+// ----------------------------- setup -------------------------------------
+const $ = id => document.getElementById(id);
+const p = P.p, n = P.p - 1, DPR = window.devicePixelRatio || 1;
+const COL = {a: "#2563eb", b: "#ea580c", ans: "#16a34a", warn: "#dc2626"};
+const CHAR_COLORS = ["#7c3aed", "#0891b2", "#db2777", "#a16207", "#4d7c0f",
+                     "#be123c", "#0e7490"];
+const charColor = {};
+P.K.forEach((k, i) => charColor[k] = CHAR_COLORS[i % CHAR_COLORS.length]);
+const isHelper = k => P.helpers[k] !== undefined;
+const TAU = 2 * Math.PI;
+let A = 7 % p || 1, B = 12 % p || 2;
+let fwd = null;          // current forward-pass results
+let anim = null;         // walkthrough animation handle
 
-// token order by dlog, for the wave panel x-axis
 const byDlog = new Array(n);
 for (let a = 1; a < p; a++) byDlog[P.dlog[a]] = a;
 
-// precompute clock coordinates per character
-const coords = {};
+// clock geometry: coordinates of all tokens in each character plane,
+// plus each plane's rotational orientation (chirality)
+const geom = {};
 for (const k of P.K) {
   const {e1, e2} = P.planes[k];
   const pts = [];
@@ -246,117 +363,180 @@ for (const k of P.K) {
     }
     pts.push([u, v]);
   }
-  coords[k] = pts;
+  const ang = tok => Math.atan2(pts[tok - 1][1], pts[tok - 1][0]);
+  // orientation: stepping x -> g*x should advance angle by ±2πk/n
+  let s = 0;
+  for (let j = 0; j < 6; j++) {
+    const x0 = byDlog[j], x1 = byDlog[j + 1];
+    let d = ang(x1) - ang(x0);
+    while (d > Math.PI) d -= TAU;
+    while (d < -Math.PI) d += TAU;
+    s += d;
+  }
+  geom[k] = {pts, ang, orient: Math.sign(s) || 1};
 }
 
-function makePanel(row, id, w, h, cap) {
-  const div = document.createElement("div");
-  div.className = "panel";
+function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
+
+// ----------------------------- panels -------------------------------------
+function makeCanvas(parent, w, h, label) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
   const cv = document.createElement("canvas");
-  cv.id = id; cv.width = w * devicePixelRatio; cv.height = h * devicePixelRatio;
+  cv.width = w * DPR; cv.height = h * DPR;
   cv.style.width = w + "px"; cv.style.height = h + "px";
-  const capEl = document.createElement("div");
-  capEl.className = "cap"; capEl.textContent = cap;
-  div.appendChild(cv); div.appendChild(capEl);
-  document.getElementById(row).appendChild(div);
+  cell.appendChild(cv);
+  const lab = document.createElement("div");
+  lab.className = "lab"; lab.innerHTML = label;
+  cell.appendChild(lab);
+  $(parent).appendChild(cv.parentElement === cell ? cell : cell);
   return cv;
 }
 
-const clockCv = {}, clusterCv = {};
+const CW = 196;
+const lookupCv = {}, addCv = {}, clusterCv = {};
 for (const k of P.K) {
-  const role = P.helpers[k] !== undefined ? `helper of χ_${P.helpers[k]}` : "primary";
-  clockCv[k] = makePanel("clock-row", `clock-${k}`, 190, 190,
-                         `χ_${k} clock (${role})`);
+  const role = isHelper(k)
+    ? `<b>χ_${k}</b> · helper of χ_${P.helpers[k]}`
+    : `<b>χ_${k}</b> · primary`;
+  lookupCv[k] = makeCanvas("row-lookup", CW, CW, role);
+  addCv[k] = makeCanvas("row-add", CW, CW, role);
 }
-const attnCv = makePanel("clock-row", "attn", 190, 190, "attention from '='");
 for (const k of P.K) {
   const nn = P.clusters[k].idx.length;
-  clusterCv[k] = makePanel("cluster-row", `cl-${k}`, 190, 190,
-    nn ? `χ_${k} cluster — ${nn} neurons, red ±θ(a)+θ(b)`
-       : `χ_${k}: no neurons (free rider)`);
-}
-const waveCv = document.getElementById("waves");
-function sizeWaves() {
-  const w = document.getElementById("wave-panel").clientWidth - 16;
-  waveCv.width = w * devicePixelRatio; waveCv.height = 270 * devicePixelRatio;
-  waveCv.style.width = w + "px"; waveCv.style.height = "270px";
+  clusterCv[k] = makeCanvas("row-cluster", CW, CW,
+    nn ? `<b>χ_${k}</b> · ${nn} neurons` : `<b>χ_${k}</b> · 0 neurons (free rider)`);
 }
 
 function ctx2d(cv) {
   const c = cv.getContext("2d");
-  c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
   return c;
 }
 
-function drawClock(k) {
-  const cv = clockCv[k], c = ctx2d(cv);
-  const W = cv.width / devicePixelRatio, H = cv.height / devicePixelRatio;
-  c.clearRect(0, 0, W, H);
-  const pts = coords[k];
+function clockBase(cv, k) {
+  const c = ctx2d(cv);
+  c.clearRect(0, 0, CW, CW);
+  const pts = geom[k].pts;
   let R = 0;
   for (const [u, v] of pts) R = Math.max(R, Math.hypot(u, v));
-  const sc = (Math.min(W, H) / 2 - 12) / (R || 1), cx = W / 2, cy = H / 2;
-  c.fillStyle = "#ccc";
+  const sc = (CW / 2 - 14) / (R || 1), cx = CW / 2, cy = CW / 2;
+  c.strokeStyle = "#eeede9"; c.lineWidth = 1;
+  c.beginPath(); c.arc(cx, cy, (CW / 2 - 14), 0, TAU); c.stroke();
+  c.fillStyle = "#d4d2cc";
   for (const [u, v] of pts) {
-    c.beginPath(); c.arc(cx + u * sc, cy - v * sc, 1.6, 0, 7); c.fill();
+    c.beginPath(); c.arc(cx + u * sc, cy - v * sc, 1.7, 0, TAU); c.fill();
   }
-  const hand = (tok, col) => {
-    const [u, v] = pts[tok - 1];
-    c.strokeStyle = col; c.lineWidth = 2.2;
-    c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + u * sc, cy - v * sc); c.stroke();
-    c.fillStyle = col;
-    c.beginPath(); c.arc(cx + u * sc, cy - v * sc, 3.4, 0, 7); c.fill();
-  };
-  hand(A, COL.a); hand(B, COL.b); hand((A * B) % p, COL.ans);
+  return {c, sc, cx, cy, R: CW / 2 - 14};
 }
 
-function drawAttn(attn) {
-  const c = ctx2d(attnCv);
-  const W = 190, H = 190, nh = attn.length;
-  c.clearRect(0, 0, W, H);
-  const cw = (W - 50) / 3, ch = (H - 30) / nh;
-  for (let h = 0; h < nh; h++) {
-    for (let s = 0; s < 3; s++) {
-      const val = attn[h][s];
-      c.fillStyle = `rgba(31,119,180,${val})`;
-      c.fillRect(40 + s * cw, 8 + h * ch, cw - 2, ch - 2);
-      c.fillStyle = val > 0.55 ? "#fff" : "#333";
-      c.font = "10px sans-serif"; c.textAlign = "center";
-      c.fillText(val.toFixed(2), 40 + s * cw + cw / 2, 8 + h * ch + ch / 2 + 3);
+function hand(c, cx, cy, x, y, col, w, dash) {
+  c.save();
+  c.strokeStyle = col; c.lineWidth = w;
+  if (dash) c.setLineDash(dash);
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+  c.restore();
+  c.fillStyle = col;
+  c.beginPath(); c.arc(x, y, w + 1.6, 0, TAU); c.fill();
+}
+
+function tokenXY(k, tok, sc, cx, cy) {
+  const [u, v] = geom[k].pts[tok - 1];
+  return [cx + u * sc, cy - v * sc];
+}
+
+function drawLookup(k) {
+  const {c, sc, cx, cy} = clockBase(lookupCv[k], k);
+  const [ax, ay] = tokenXY(k, A, sc, cx, cy);
+  const [bx, by] = tokenXY(k, B, sc, cx, cy);
+  hand(c, cx, cy, ax, ay, COL.a, 2.4);
+  hand(c, cx, cy, bx, by, COL.b, 2.4);
+  c.font = "600 11px sans-serif";
+  c.fillStyle = COL.a; c.fillText("a", ax + 5, ay - 5);
+  c.fillStyle = COL.b; c.fillText("b", bx + 5, by - 5);
+}
+
+// t ∈ [0,1]: green hand sweeps from a's angle by b's angle
+function drawAdd(k, t) {
+  const {c, sc, cx, cy} = clockBase(addCv[k], k);
+  const G = geom[k];
+  const ans = (A * B) % p;
+  const [ax, ay] = tokenXY(k, A, sc, cx, cy);
+  hand(c, cx, cy, ax, ay, COL.a, 1.6);
+  const [bx, by] = tokenXY(k, B, sc, cx, cy);
+  hand(c, cx, cy, bx, by, COL.b, 1.6);
+
+  const angA = G.ang(A), angAns = G.ang(ans);
+  let delta = G.orient * (angAns - angA);
+  while (delta < 0) delta += TAU;
+  while (delta >= TAU) delta -= TAU;
+  const phi = angA + G.orient * delta * t;
+  const r = Math.hypot(...G.pts[ans - 1]) * sc;
+  const gx = cx + r * Math.cos(phi), gy = cy - r * Math.sin(phi);
+
+  // swept arc
+  c.save();
+  c.strokeStyle = COL.ans; c.globalAlpha = 0.35; c.lineWidth = 5;
+  c.beginPath();
+  if (G.orient > 0) c.arc(cx, cy, r * 0.55, -angA, -(angA + delta * t), true);
+  else c.arc(cx, cy, r * 0.55, -angA, -(angA - delta * t), false);
+  c.stroke();
+  c.restore();
+
+  // target dot for a·b
+  const [tx, ty] = tokenXY(k, ans, sc, cx, cy);
+  c.strokeStyle = COL.ans; c.lineWidth = 1.2;
+  c.beginPath(); c.arc(tx, ty, 5.5, 0, TAU); c.stroke();
+
+  hand(c, cx, cy, gx, gy, COL.ans, 2.6);
+
+  // helper χ_{2m}: dashed hand at TWICE the primary's measured rotation —
+  // θ_{2m}(x) = 2·θ_m(x), so doubling χ_m's angle must land on χ_{2m}'s own
+  // hand. Coincidence of dashed and solid is the free-rider relation.
+  if (isHelper(k) && t >= 1) {
+    const m = P.helpers[k], Gm = geom[m];
+    if (Gm) {
+      let relM = Gm.orient * (Gm.ang(ans) - Gm.ang(1));
+      while (relM < 0) relM += TAU;
+      const phiPred = G.ang(1) + G.orient * ((2 * relM) % TAU);
+      const rH = Math.hypot(...G.pts[ans - 1]) * sc * 0.8;
+      hand(c, cx, cy, cx + rH * Math.cos(phiPred),
+           cy - rH * Math.sin(phiPred), COL.ans, 1.3, [5, 4]);
     }
-    c.fillStyle = "#333"; c.textAlign = "left";
-    c.fillText(`h${h}`, 18, 8 + h * ch + ch / 2 + 3);
   }
-  c.textAlign = "center";
-  ["a", "b", "="].forEach((t, s) =>
-    c.fillText(t, 40 + s * cw + cw / 2, H - 8));
+  if (t >= 1) {
+    c.font = "600 11px sans-serif"; c.fillStyle = COL.ans;
+    c.fillText("a·b ✓", tx + 7, ty + 3);
+  }
 }
 
-function drawCluster(k, mlpPost) {
+function drawCluster(k, t) {
   const cv = clusterCv[k], c = ctx2d(cv);
-  const W = 190, H = 190, cx = W / 2, cy = H / 2, R = 78;
-  c.clearRect(0, 0, W, H);
-  c.strokeStyle = "#eee";
-  c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke();
+  c.clearRect(0, 0, CW, CW);
+  const cx = CW / 2, cy = CW / 2, R = CW / 2 - 16;
+  c.strokeStyle = "#eeede9";
+  c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.stroke();
   const {idx, phi} = P.clusters[k];
   if (!idx.length) {
-    c.fillStyle = "#999"; c.font = "11px sans-serif"; c.textAlign = "center";
-    c.fillText("rides χ_" + P.helpers[k] + "'s cluster", cx, cy);
+    c.fillStyle = "#9c9a94"; c.font = "12px sans-serif"; c.textAlign = "center";
+    c.fillText("no neurons —", cx, cy - 8);
+    c.fillText(`rides χ_${P.helpers[k]}'s cluster`, cx, cy + 10);
+    c.textAlign = "left";
     return;
   }
   let amax = 1e-9;
-  for (const i of idx) amax = Math.max(amax, mlpPost[i]);
-  c.fillStyle = "rgba(31,119,180,0.75)";
+  for (const i of idx) amax = Math.max(amax, fwd.mlpPost[i]);
+  c.fillStyle = charColor[k] + "c0";
   for (let j = 0; j < idx.length; j++) {
-    const r = (mlpPost[idx[j]] / amax) * R;
-    const w = 0.32;
+    const r = t * (fwd.mlpPost[idx[j]] / amax) * R;
+    const w = 0.34;
     c.beginPath(); c.moveTo(cx, cy);
     c.arc(cx, cy, r, -phi[j] - w / 2, -phi[j] + w / 2);
     c.closePath(); c.fill();
   }
-  const tgt = 2 * Math.PI * k * ((P.dlog[A] + P.dlog[B]) % n) / n;
+  const tgt = TAU * k * ((P.dlog[A] + P.dlog[B]) % n) / n;
   for (const [sgn, dash] of [[1, []], [-1, [4, 3]]]) {
-    c.strokeStyle = "#c33"; c.lineWidth = 1.5; c.setLineDash(dash);
+    c.strokeStyle = COL.warn; c.lineWidth = 1.5; c.setLineDash(dash);
     c.beginPath(); c.moveTo(cx, cy);
     c.lineTo(cx + R * Math.cos(sgn * tgt), cy - R * Math.sin(sgn * tgt));
     c.stroke();
@@ -364,35 +544,92 @@ function drawCluster(k, mlpPost) {
   c.setLineDash([]);
 }
 
-function drawWaves(logits) {
-  const c = ctx2d(waveCv);
-  const W = waveCv.width / devicePixelRatio, H = 270;
+function sizeWide(cv, h) {
+  const w = cv.parentElement.clientWidth;
+  cv.width = w * DPR; cv.height = h * DPR;
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  return w;
+}
+
+// stage 4: coset elimination strips, one per character + intersection
+function drawCosets(t) {
+  const cv = $("cosets");
+  const W = cv.width / DPR, rowH = 30, padL = 120, padR = 16;
+  const c = ctx2d(cv);
+  c.clearRect(0, 0, W, cv.height / DPR);
+  const cellW = (W - padL - padR) / n;
+  const xAns = (P.dlog[A] + P.dlog[B]) % n;
+  const nShow = Math.ceil(P.K.length * Math.min(1, t * P.K.length /
+                          Math.max(P.K.length, 1)));
+  const survives = k => {
+    const out = new Array(n).fill(false);
+    const G = gcd(k, n), step = n / G;
+    for (let j = 0; j < G; j++) out[(xAns + j * step) % n] = true;
+    return out;
+  };
+  let inter = new Array(n).fill(true);
+  P.K.forEach((k, row) => {
+    const y = 8 + row * rowH;
+    const vis = (t * (P.K.length + 1)) > row;
+    const sv = survives(k);
+    for (let i = 0; i < n; i++) inter[i] = inter[i] && sv[i];
+    if (!vis) return;
+    c.font = "600 12px sans-serif"; c.fillStyle = charColor[k];
+    c.fillText(`χ_${k}`, 8, y + 15);
+    c.font = "11px sans-serif"; c.fillStyle = "#9c9a94";
+    c.fillText(`keeps ${gcd(k, n)}`, 44, y + 15);
+    for (let i = 0; i < n; i++) {
+      c.fillStyle = sv[i] ? charColor[k] : "#efeeea";
+      c.fillRect(padL + i * cellW, y, Math.max(cellW - 1, 1), rowH - 9);
+    }
+  });
+  const yI = 8 + P.K.length * rowH + 6;
+  if (t * (P.K.length + 1) > P.K.length) {
+    c.font = "600 12px sans-serif"; c.fillStyle = "#1c1c1a";
+    c.fillText("∩ all", 8, yI + 15);
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      c.fillStyle = inter[i] ? COL.ans : "#efeeea";
+      if (inter[i]) count++;
+      c.fillRect(padL + i * cellW, yI, Math.max(cellW - 1, 1), rowH - 9);
+    }
+    c.font = "11px sans-serif"; c.fillStyle = "#9c9a94";
+    c.fillText(`${count} left`, 44, yI + 15);
+    const ans = (A * B) % p;
+    c.font = "600 11.5px sans-serif"; c.fillStyle = COL.ans;
+    const x = padL + xAns * cellW;
+    c.fillText(`c = ${ans}`, Math.min(x + 5, W - 60), yI + rowH + 8);
+  }
+  void nShow;
+}
+
+function drawWaves(t) {
+  const cv = $("waves");
+  const W = cv.width / DPR, H = cv.height / DPR;
+  const c = ctx2d(cv);
   c.clearRect(0, 0, W, H);
-  const padL = 8, padR = 8, plotW = W - padL - padR;
+  const padL = 36, padR = 10, plotW = W - padL - padR;
   const xs = i => padL + plotW * i / (n - 1);
+  const logits = fwd.logits;
   const Lmean = logits.reduce((s, v) => s + v, 0) / p;
-  // per-character projections of the live logits
   const waves = [], total = new Float64Array(n);
   for (const k of P.K) {
     const cr = P.basis[k].cos, sr = P.basis[k].sin;
     let pc = 0, ps = 0;
-    for (let t = 0; t < p; t++) { pc += cr[t] * logits[t]; ps += sr[t] * logits[t]; }
+    for (let tk = 0; tk < p; tk++) { pc += cr[tk] * logits[tk]; ps += sr[tk] * logits[tk]; }
     const w = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      const t = byDlog[i];
-      w[i] = cr[t] * pc + sr[t] * ps;
+      const tok = byDlog[i];
+      w[i] = cr[tok] * pc + sr[tok] * ps;
       total[i] += w[i];
     }
     waves.push(w);
   }
-  let span = 1e-9;
-  for (let i = 0; i < n; i++)
-    span = Math.max(span, Math.abs(logits[byDlog[i]] - Lmean));
-  const lane = H / (P.K.length + 1.6);
-  const colors = ["#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22"];
-  const drawLine = (arr, y0, amp, col, lw) => {
+  const lane = H / (P.K.length + 2.1);
+  const iMax = Math.max(2, Math.floor(n * Math.min(t, 1)));
+  const line = (arr, y0, amp, col, lw) => {
     c.strokeStyle = col; c.lineWidth = lw; c.beginPath();
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < iMax; i++) {
       const y = y0 - arr[i] * amp;
       i ? c.lineTo(xs(i), y) : c.moveTo(xs(i), y);
     }
@@ -401,61 +638,109 @@ function drawWaves(logits) {
   waves.forEach((w, j) => {
     let wmax = 1e-9;
     for (let i = 0; i < n; i++) wmax = Math.max(wmax, Math.abs(w[i]));
-    drawLine(w, lane * (j + 0.7), lane * 0.42 / wmax, colors[j % 5], 1);
-    c.fillStyle = colors[j % 5]; c.font = "11px sans-serif"; c.textAlign = "left";
-    c.fillText("χ_" + P.K[j], padL + 2, lane * (j + 0.7) - lane * 0.32);
+    const y0 = lane * (j + 0.75);
+    line(w, y0, lane * 0.4 / wmax, charColor[P.K[j]], 1.1);
+    c.fillStyle = charColor[P.K[j]];
+    c.font = "600 11.5px sans-serif"; c.textAlign = "left";
+    c.fillText("χ_" + P.K[j], 4, y0 + 4);
   });
-  const y0 = lane * (P.K.length + 1.1), amp = lane * 0.95 / span;
-  const tot = new Float64Array(n), act = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    tot[i] = total[i]; act[i] = logits[byDlog[i]] - Lmean;
-  }
-  drawLine(act, y0, amp, "#bbb", 1);
-  drawLine(tot, y0, amp, "#000", 1.4);
+  let span = 1e-9;
+  for (let i = 0; i < n; i++)
+    span = Math.max(span, Math.abs(logits[byDlog[i]] - Lmean));
+  const y0 = lane * (P.K.length + 1.35), amp = lane * 1.15 / span;
+  const act = new Float64Array(n);
+  for (let i = 0; i < n; i++) act[i] = logits[byDlog[i]] - Lmean;
+  line(act, y0, amp, "#b9b7b1", 1);
+  line(total, y0, amp, "#111", 1.5);
+  c.fillStyle = "#111"; c.font = "600 11.5px sans-serif";
+  c.fillText("Σ", 14, y0 + 4);
   const xAns = xs((P.dlog[A] + P.dlog[B]) % n);
-  c.strokeStyle = COL.ans; c.lineWidth = 1.4; c.setLineDash([5, 4]);
-  c.beginPath(); c.moveTo(xAns, 6); c.lineTo(xAns, H - 4); c.stroke();
+  c.strokeStyle = COL.ans; c.lineWidth = 1.4; c.setLineDash([6, 4]);
+  c.beginPath(); c.moveTo(xAns, 6); c.lineTo(xAns, H - 16); c.stroke();
   c.setLineDash([]);
+  c.fillStyle = COL.ans; c.textAlign = "center";
+  c.fillText("a·b", xAns, H - 3);
+  c.textAlign = "left";
+  c.fillStyle = "#9c9a94"; c.font = "11px sans-serif";
+  c.fillText("candidates c, ordered by dlog(c) →", padL, H - 3);
 }
 
-function refresh() {
-  const {logits, attn, mlpPost} = runForward(P, A, B);
-  for (const k of P.K) { drawClock(k); drawCluster(k, mlpPost); }
-  drawAttn(attn);
-  drawWaves(logits);
+// ----------------------------- orchestration ------------------------------
+function renderAll(opts) {
+  const o = Object.assign({add: 1, cluster: 1, coset: 1, wave: 1}, opts);
+  fwd = runForward(P, A, B);
+  for (const k of P.K) {
+    drawLookup(k);
+    drawAdd(k, o.add);
+    drawCluster(k, o.cluster);
+  }
+  drawCosets(o.coset);
+  drawWaves(o.wave);
   let arg = 0;
-  for (let cdt = 1; cdt < p; cdt++) if (logits[cdt] > logits[arg]) arg = cdt;
+  for (let cdt = 1; cdt < p; cdt++) if (fwd.logits[cdt] > fwd.logits[arg]) arg = cdt;
   const ans = (A * B) % p, ok = arg === ans;
-  const el = document.getElementById("result");
-  el.textContent = `${A} × ${B} ≡ ${ans} (mod ${p}) — model says ${arg} ${ok ? "✓" : "✗"}`;
+  const el = $("result");
+  el.textContent = `${A} × ${B} ≡ ${ans} — model says ${arg} ${ok ? "✓" : "✗"}`;
   el.className = "result " + (ok ? "ok" : "bad");
-  document.getElementById("in-a").value = A;
-  document.getElementById("in-b").value = B;
-  document.getElementById("sl-a").value = A;
-  document.getElementById("sl-b").value = B;
+  $("in-a").value = A; $("sl-a").value = A;
+  $("in-b").value = B; $("sl-b").value = B;
+  $("dyn-lookup").innerHTML =
+    `dlog(<b>${A}</b>) = <b>${P.dlog[A]}</b> &nbsp;·&nbsp; ` +
+    `dlog(<b>${B}</b>) = <b>${P.dlog[B]}</b> &nbsp;·&nbsp; ` +
+    `dlog(a·b) = ${P.dlog[A]} + ${P.dlog[B]} ≡ <b>${(P.dlog[A] + P.dlog[B]) % n}</b> (mod ${n})`;
+}
+
+function walkthrough() {
+  if (anim) cancelAnimationFrame(anim);
+  const T = [1400, 900, 1400, 1100];   // add, cluster, coset, wave durations
+  const start = performance.now();
+  const ease = u => u < 0 ? 0 : u > 1 ? 1 : u * u * (3 - 2 * u);
+  function frame(now) {
+    const el = now - start;
+    let acc = 0;
+    const ph = [];
+    for (const d of T) { ph.push((el - acc) / d); acc += d; }
+    renderAll({
+      add: ease(ph[0]),
+      cluster: ease(ph[1]),
+      coset: ease(ph[2]),
+      wave: ease(ph[3]),
+    });
+    if (el < acc) anim = requestAnimationFrame(frame);
+    else anim = null;
+  }
+  anim = requestAnimationFrame(frame);
+}
+
+// meta line
+{
+  const chips = P.K.map(k => isHelper(k)
+    ? `<span class="chip helper">χ_${k} = 2·χ_${P.helpers[k]} (helper)</span>`
+    : `<span class="chip">χ_${k} primary</span>`).join(" ");
+  $("meta").innerHTML =
+    `The trained model runs <b>live in this page</b> (forward pass ported to ` +
+    `JavaScript). p = <b>${p}</b>, primitive root g = <b>${P.g}</b>, ` +
+    `d_model = ${P.cfg.d_model}, d_mlp = ${P.cfg.d_mlp}. ` +
+    `Characters in use: ${chips}`;
 }
 
 for (const [id, set] of [["in-a", v => A = v], ["sl-a", v => A = v],
                          ["in-b", v => B = v], ["sl-b", v => B = v]]) {
-  const el = document.getElementById(id);
+  const el = $(id);
   el.max = p - 1;
   el.addEventListener("input", e => {
     const v = parseInt(e.target.value, 10);
-    if (v >= 1 && v < p) { set(v); refresh(); }
+    if (v >= 1 && v < p) { set(v); renderAll(); }
   });
 }
-document.getElementById("step").addEventListener("click",
-  () => { B = (B * P.g) % p; refresh(); });
-document.getElementById("anim").addEventListener("click", e => {
-  if (timer) { clearInterval(timer); timer = null; e.target.textContent = "▶ animate"; }
-  else {
-    timer = setInterval(() => { B = (B * P.g) % p; refresh(); }, 280);
-    e.target.textContent = "⏸ stop";
-  }
+$("step").addEventListener("click", () => { B = (B * P.g) % p; walkthrough(); });
+$("play").addEventListener("click", walkthrough);
+window.addEventListener("resize", () => {
+  sizeWide($("cosets"), 8 + (P.K.length + 1) * 30 + 24);
+  sizeWide($("waves"), 300);
+  renderAll();
 });
-window.addEventListener("resize", () => { sizeWaves(); refresh(); });
 
-// forward-pass verification against PyTorch reference logits
 (function verify() {
   let worst = 0;
   for (const chk of P.checks) {
@@ -463,15 +748,17 @@ window.addEventListener("resize", () => { sizeWaves(); refresh(); });
     for (let i = 0; i < p; i++)
       worst = Math.max(worst, Math.abs(logits[i] - chk.logits[i]));
   }
-  const el = document.getElementById("badge");
+  const el = $("badge");
   el.textContent = worst < 1e-3
-    ? `forward pass verified vs PyTorch (max Δ = ${worst.toExponential(1)})`
-    : `FORWARD PASS MISMATCH (max Δ = ${worst.toExponential(1)})`;
-  el.style.color = worst < 1e-3 ? "#2a7d2a" : "#c33";
+    ? `forward pass verified vs PyTorch (Δ ≤ ${worst.toExponential(1)})`
+    : `FORWARD PASS MISMATCH (Δ = ${worst.toExponential(1)})`;
+  el.style.color = worst < 1e-3 ? "#16a34a" : "#dc2626";
 })();
 
-sizeWaves();
-refresh();
+sizeWide($("cosets"), 8 + (P.K.length + 1) * 30 + 24);
+sizeWide($("waves"), 300);
+renderAll();
+walkthrough();
 </script>
 </body>
 </html>
@@ -482,9 +769,11 @@ def export(run_dir: str, out_file: str | None = None) -> Path:
     S = Session.from_run(run_dir)
     payload = build_payload(S)
     run = Path(run_dir)
-    title = f"mod-{payload['p']} multiplication — {run.name}"
     html = (HTML_TEMPLATE
-            .replace("__TITLE__", title)
+            .replace("__TITLE__", f"mod-{payload['p']} multiplication — {run.name}")
+            .replace("__P__", str(payload["p"]))
+            .replace("__G__", str(payload["g"]))
+            .replace("__NK__", str(len(payload["K"])))
             .replace("__PAYLOAD__", json.dumps(payload, separators=(",", ":"))))
     if out_file is None:
         exp = run.parent.parent.name
