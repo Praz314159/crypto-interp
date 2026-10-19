@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from ..runs.checkpoint import Checkpoint, checkpoint_paths, load_checkpoint
+from ..runs.checkpoint import Checkpoint, latest_checkpoint, load_checkpoint
+
+__all__ = ["latest_checkpoint", "load_run"]
 
 
 def load_run(ckpt_path: str | Path, device: str = "cpu"):
@@ -16,11 +18,3 @@ def load_run(ckpt_path: str | Path, device: str = "cpu"):
     ckpt: Checkpoint = load_checkpoint(ckpt_path, map_location=device)
     ds = ckpt.task.build()
     return ckpt.build_model(device), ds, ckpt
-
-
-def latest_checkpoint(run_dir: str | Path) -> Path:
-    """The run's highest-epoch checkpoint (quarantined ``_strays/`` are ignored)."""
-    ckpts = checkpoint_paths(run_dir)
-    if not ckpts:
-        raise FileNotFoundError(f"No checkpoints in {run_dir}")
-    return ckpts[-1]

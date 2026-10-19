@@ -139,3 +139,11 @@ def checkpoint_paths(run_dir: str | Path) -> list[Path]:
     """A run's checkpoints in epoch order. Only the run directory itself is
     searched, so quarantined files under ``_strays/`` are never picked up."""
     return sorted(Path(run_dir).glob("checkpoint_*.pt"), key=checkpoint_epoch)
+
+
+def latest_checkpoint(run_dir: str | Path) -> Path:
+    """The run's highest-epoch checkpoint."""
+    ckpts = checkpoint_paths(run_dir)
+    if not ckpts:
+        raise FileNotFoundError(f"no checkpoints in {run_dir}")
+    return ckpts[-1]
