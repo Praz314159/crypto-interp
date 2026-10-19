@@ -142,6 +142,16 @@ def _noise_classes(pop, args):
     return noise.classes(M.noise_modes.at(run.latest()), run.id)
 
 
+@recipe("walkthrough", "one forward pass (--a, --b) through clocks, clusters and logits")
+def _walkthrough(pop, args):
+    from ..interp import Session
+    from ..viz.walkthrough import make_figure
+
+    if args.a is None or args.b is None:
+        raise SystemExit("walkthrough needs --a and --b")
+    return make_figure(Session.from_run(_one(pop)), args.a, args.b)
+
+
 # ---- no runs ------------------------------------------------------------
 
 
