@@ -17,6 +17,9 @@ ALLOWED = {
     "data": {"reference"},
     "runs": {"models", "data"},
     "training": {"models", "data", "runs"},
+    "interp": {"models", "data", "runs", "reference"},
+    "measures": {"interp", "runs", "models", "data", "reference"},
+    "figures": set(),
 }
 
 
