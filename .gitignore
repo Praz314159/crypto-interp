@@ -47,3 +47,6 @@ papers/
 
 # Local config
 .env
+
+# Personal learning exercises — not project code
+scratch/
