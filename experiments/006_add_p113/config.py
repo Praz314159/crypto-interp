@@ -20,7 +20,6 @@ currently default to the multiplicative basis — they will dispatch on
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="add",
     p=113,

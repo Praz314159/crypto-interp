@@ -21,7 +21,6 @@ Analyze:
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=181,

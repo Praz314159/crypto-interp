@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-
 from crypto_interp.interp import char_index, essential_characters, load_run
 
 

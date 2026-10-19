@@ -9,7 +9,6 @@ Scripts read ``CONFIG`` from this module by convention.
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=113,

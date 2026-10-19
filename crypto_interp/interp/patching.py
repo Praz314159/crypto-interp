@@ -35,7 +35,6 @@ from jaxtyping import Float, Int
 from .cache import ActivationCache, HookKey
 from .hooks import _resolve_hook_name, run_with_hooks
 
-
 MetricFn = Callable[[Float[torch.Tensor, "batch pos d_vocab"]], float]
 
 

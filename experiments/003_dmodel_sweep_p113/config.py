@@ -13,7 +13,6 @@ home in figures/.
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=113,

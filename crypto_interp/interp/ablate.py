@@ -104,8 +104,8 @@ def essential_characters(
     where ``cls`` is vestigial / load-bearing / essential by ``loss_jump`` cuts,
     and ``K`` is the set of characters with >= ``threshold`` x max W_E energy.
     """
-    from .metrics import char_energy, order_of  # local import avoids import cycle
     from .interventions import ablate_char_w  # local import: interventions depends on ablate
+    from .metrics import char_energy, order_of  # local import avoids import cycle
 
     p = ds.p
     W_val = model.embed.W_E.detach()[:, :p]

@@ -32,10 +32,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from crypto_interp.analysis.error_localization import analyze_run
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.analysis.error_localization import analyze_run
-
 
 PRIME_RUNS = {
     113: "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed*",
@@ -156,7 +155,7 @@ def analyze_population(pattern: str, p_expect: int) -> list[dict]:
         )
         bad = [r for r in rows if r["run"] == run.name and max(r["err_a"], r["err_b"]) > 0.01]
         msg = (
-            f"  defect tokens: "
+            "  defect tokens: "
             + ", ".join(
                 f"{r['token']} (err {max(r['err_a'], r['err_b']):.1%}, "
                 f"dev {r['in_dev'] / med_dev:.1f}× median @ χ_{r['worst_k']})"
@@ -257,8 +256,10 @@ def plot_scatter(rows: list[dict], out_dir: Path) -> None:
 
 def _setup_run(run_dir: str):
     """Shared scaffold: session, errors, K, geometry fit, defect tokens."""
-    import torch
     from collections import Counter
+
+    import torch
+
     from crypto_interp.interp.grids import compute_logits_grid
 
     S = Session.from_run(run_dir)

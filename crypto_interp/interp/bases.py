@@ -23,7 +23,6 @@ from dataclasses import dataclass
 
 import torch
 
-
 # ---------- Additive Fourier basis on Z/p ----------
 
 

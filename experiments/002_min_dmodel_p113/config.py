@@ -9,7 +9,6 @@ PosEmbed than the d_model=128 baseline.
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=113,

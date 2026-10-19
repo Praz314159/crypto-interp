@@ -34,9 +34,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from crypto_interp.analysis.inference_viewer import char_plane, neuron_phases
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.analysis.inference_viewer import char_plane, neuron_phases
 
 
 def _arr(t) -> list:

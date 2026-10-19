@@ -36,7 +36,6 @@ import numpy as np
 
 from crypto_interp.interp import Session
 
-
 # ---------------------------------------------------------------------------
 # Core analysis
 # ---------------------------------------------------------------------------
@@ -174,7 +173,7 @@ def print_one(d: dict) -> None:
     ]
     t_out.sort(key=lambda x: -x[1])
 
-    print(f"  >3σ outlier tokens by err rate:")
+    print("  >3σ outlier tokens by err rate:")
     print(f"    as A: {a_out[:8]}")
     print(f"    as B: {b_out[:8]}")
     print(f"    as target c: {t_out[:8]}")
@@ -182,7 +181,7 @@ def print_one(d: dict) -> None:
     b_set = {x for x, _ in b_out}
     print(f"    A∩B (A↔B-symmetric outliers): {sorted(a_set & b_set)}")
 
-    print(f"  first 10 incorrect (a, b):")
+    print("  first 10 incorrect (a, b):")
     for w in d["wrong_pairs"][:10]:
         print(
             f"    a={w['a']:>3} b={w['b']:>3}  pred={w['predicted']:>3}  "
@@ -340,7 +339,7 @@ def plot_population(results: list[dict], out_dir: Path) -> None:
         )
         ax.annotate(f" s{seed}", (d["accuracy"], d["n_wrong"]), fontsize=10)
     ax.set_xlabel("argmax accuracy")
-    ax.set_ylabel(f"# wrong examples  (out of (p−1)²)")
+    ax.set_ylabel("# wrong examples  (out of (p−1)²)")
     ax.set_yscale("symlog")
     ax.set_title("Accuracy & error count")
     ax.grid(True, alpha=0.3, which="both")

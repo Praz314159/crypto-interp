@@ -7,7 +7,7 @@ one field here, not parsing a new CLI flag.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass

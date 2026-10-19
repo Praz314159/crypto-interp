@@ -135,7 +135,7 @@ def main():
     datasets_dir = exp_dir / "datasets"
 
     # Import inside main so --help doesn't pull in torch.
-    from crypto_interp.training import train, resume
+    from crypto_interp.training import resume, train
 
     if args.resume:
         resume_path = Path(args.resume)

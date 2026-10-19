@@ -64,7 +64,7 @@ class Session:
     @classmethod
     def from_run(cls, run_dir, device: str = "cpu") -> "Session":
         """Load model + dataset from a run directory; build basis/char_index from ds.p."""
-        from .load import load_run, latest_checkpoint
+        from .load import latest_checkpoint, load_run
 
         model, ds, _ = load_run(latest_checkpoint(run_dir), device=device)
         return cls(model, ds)
@@ -206,7 +206,7 @@ class Session:
         explicitly otherwise. Returns a dict ``{"bifurcation", "commit", "cliff",
         "K", "epochs"}``.
         """
-        from .dynamics import bifurcation_step, commit_step, cliff_step
+        from .dynamics import bifurcation_step, cliff_step, commit_step
 
         if metrics_path is None:
             raise ValueError("metrics_path required (point at the run's metrics.pt)")

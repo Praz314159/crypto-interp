@@ -18,7 +18,6 @@ Analyze any resulting run with the canonical library analyses, e.g.:
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=127,

@@ -1,3 +1,3 @@
-from .transformer import Transformer, TransformerConfig, HookPoint
+from .transformer import HookPoint, Transformer, TransformerConfig
 
 __all__ = ["Transformer", "TransformerConfig", "HookPoint"]

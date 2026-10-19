@@ -35,7 +35,6 @@ import torch
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
 
-
 # ---------------------------------------------------------------------------
 # Geometry helpers
 # ---------------------------------------------------------------------------

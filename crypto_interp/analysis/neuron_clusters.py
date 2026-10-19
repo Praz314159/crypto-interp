@@ -32,8 +32,8 @@ from crypto_interp.interp import (
 
 # Re-export from interp for back-compat with anything still importing here:
 from crypto_interp.interp.neurons import (  # noqa: F401
-    per_neuron_dominant_char,
     cluster_signal,
+    per_neuron_dominant_char,
     reference_cos_signal,
 )
 

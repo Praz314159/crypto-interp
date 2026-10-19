@@ -35,7 +35,6 @@ from typing import Iterable, Optional
 import numpy as np
 import torch
 
-
 # --------------------------------------------------------------------------
 # Kernel <-> amplitudes
 # --------------------------------------------------------------------------

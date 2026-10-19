@@ -26,7 +26,6 @@ import numpy as np
 from crypto_interp.interp import Session
 from crypto_interp.interp.theory import theory_baseline
 
-
 PRIME_RUNS = {
     113: "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed*",
     127: "experiments/004_p127/runs/dmodel_24_dmlp_32_seed[0-9]*",
@@ -160,7 +159,7 @@ def main():
         # Algebraic-floor check
         nong = [r for r in rows if r["regime"] != "grokked"]
         if nong:
-            print(f"  non-grokked seeds: predicted vs observed L_sym floor:")
+            print("  non-grokked seeds: predicted vs observed L_sym floor:")
             for r in sorted(nong, key=lambda r: -r["predicted_floor"]):
                 print(
                     f"    {Path(r['run_dir']).name:42s}  "
