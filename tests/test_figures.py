@@ -58,3 +58,17 @@ def test_error_figures_render(S):
     for fig in (efig.profile(e, "ref"), efig.population({"ref": e}, {"ref": "grokked"})):
         assert fig.axes
         matplotlib.pyplot.close(fig)
+
+
+def test_clock_figures_render():
+    from crypto_interp.figures import clock as cfig
+
+    tokens = pd.DataFrame(
+        [
+            {"regime": REGIMES[i % 2], "err_a": 0.02 * (i % 3), "err_b": 0.0, "in_dev": 0.01 * i}
+            for i in range(40)
+        ]
+    )
+    fig = cfig.residual_vs_error(tokens)
+    assert fig.axes
+    matplotlib.pyplot.close(fig)

@@ -12,6 +12,15 @@
 See :mod:`crypto_interp.measures.core` for the framework.
 """
 
+from .clock import (
+    ClockDefect,
+    ClockRepair,
+    ClockResiduals,
+    clock_defect,
+    clock_repair,
+    clock_residuals,
+    token_table,
+)
 from .core import REGISTRY, Measure, measure
 from .errors import ErrorProfile, errors
 from .kernel import REGIMES, KernelNoise, kernel_noise
@@ -19,10 +28,17 @@ from .kernel import REGIMES, KernelNoise, kernel_noise
 __all__ = [
     "REGIMES",
     "REGISTRY",
+    "ClockDefect",
+    "ClockRepair",
+    "ClockResiduals",
     "ErrorProfile",
     "KernelNoise",
     "Measure",
+    "clock_defect",
+    "clock_repair",
+    "clock_residuals",
     "errors",
     "kernel_noise",
     "measure",
+    "token_table",
 ]
