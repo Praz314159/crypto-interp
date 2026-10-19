@@ -129,6 +129,7 @@ measures how true that is.
 |---|---|
 | `L_emp` | the model's cross-entropy over all (a, b) of units |
 | `L_sym` | the loss of κ_obs, the mean logit at each offset: the model's symmetric part |
+| `L_emp_test`, `L_sym_test` | the same two, over the held-out pairs only |
 | `L_K` | the loss of κ_obs restricted to K |
 | `kernel_margin` | κ_obs(0) minus its largest other value |
 | `crt_gcd`, `crt_floor` | g = gcd(K ∪ {p−1}), and log g |
@@ -140,14 +141,16 @@ The **regime** is assigned in this order:
 1. **CRT-fail** if K is non-empty and g > 1. The characters in K then cannot
    tell apart the g elements of a coset of the order-(p−1)/g subgroup. Any
    kernel on K has period (p−1)/g, so L_K ≥ log g.
-2. Otherwise **grokked** if L_emp < 0.01,
-3. **algorithmic-but-noisy** if only L_sym < 0.01,
+2. Otherwise **grokked** if L_emp_test < 0.01,
+3. **algorithmic-but-noisy** if only L_sym_test < 0.01,
 4. and **intermediate** if neither.
 
-> **Caveat.** L_sym averages over all pairs, the training pairs included. A
-> model that only memorized its training pairs can therefore score a small
-> L_sym and be labelled algorithmic-but-noisy. Read the regime together with
-> `grok_status`.
+The regime uses the held-out losses because memorization can make the
+all-pairs kernel look clean: the correct answer's logit is high on the
+training pairs, so it is high on average. On held-out pairs only a real
+algorithm can raise it. A run can be `memorized-only` by `grok_status` and
+still `algorithmic-but-noisy` here: its kernel is right on pairs it never
+trained on, but per-example noise swamps it.
 
 ### `noise_modes`
 

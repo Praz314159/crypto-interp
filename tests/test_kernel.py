@@ -44,6 +44,24 @@ def test_pure_kernel_logits_recover_the_kernel_and_its_loss():
     assert empirical_loss(logits, P) == pytest.approx(kernel_loss(kappa), rel=1e-9)
 
 
+def test_memorized_pairs_cannot_fake_the_held_out_kernel():
+    """A pure memorizer: the answer's logit is high on training pairs and flat
+    elsewhere. Over all pairs κ_obs looks like a clean kernel; over the held-out
+    pairs it is flat, with loss log(p−1)."""
+    _, dlog = discrete_log_table(P)
+    rng = np.random.default_rng(0)
+    train = rng.random((P - 1, P - 1)) < 0.3
+    a, b = np.arange(1, P)[:, None], np.arange(1, P)[None, :]
+    logits = np.zeros((P - 1, P - 1, P + 1))
+    np.put_along_axis(logits, ((a * b) % P)[..., None], np.where(train, 40.0, 0.0)[..., None], -1)
+
+    assert kernel_loss(observed_kernel(logits, P, dlog)) < 1e-2  # looks algorithmic
+    held_out = kernel_loss(observed_kernel(logits, P, dlog, ~train))
+    assert held_out == pytest.approx(np.log(P - 1))
+    assert empirical_loss(logits, P, ~train) == pytest.approx(np.log(P))
+    assert empirical_loss(logits, P, train) < 1e-12
+
+
 def test_crt_rule():
     # p = 113: p-1 = 112 = 2^4 * 7. K = {2, 4} (seed 9) misses the odd part of the 2-group.
     assert crt_gcd([2, 4], 113) == 2 and crt_floor([2, 4], 113) == pytest.approx(math.log(2))
@@ -71,4 +89,5 @@ def test_reference_model_is_grokked(S):
     assert r.K == (3, 10, 20, 51)
     assert r.regime == "grokked" and r.crt_gcd == 1 and r.crt_floor == 0
     assert r.L_emp < 1e-3 and r.L_sym < r.L_emp  # the kernel alone is better than the model
+    assert r.L_emp_test >= r.L_emp and r.L_sym_test < 1e-6  # held-out pairs are harder
     assert r.kernel_margin > 0 and r.kappa_obs.shape == (112,)

@@ -16,6 +16,11 @@ The measure :func:`kernel_noise` splits a model's loss into two parts:
 - ``L_emp``: the model's actual loss on the units grid. The gap is the
   asymmetric "noise" the kernel doesn't explain.
 
+Both are also computed on the held-out pairs alone (``L_sym_test``,
+``L_emp_test``), where memorization cannot raise the correct answer's logit.
+The regime uses those, so a run whose kernel only looks clean because of its
+training pairs is not called algorithmic.
+
 It also classifies the outcome:
 
 - **CRT-fail** when the (non-empty) characters in K cannot separate all of (Z/p)*, i.e.
@@ -23,8 +28,8 @@ It also classifies the outcome:
   (p−1)/g, ties κ(0) at g offsets, and so has loss at least ``log g`` (the
   algebraic floor). The floor bounds ``L_K``; ``L_sym`` can fall below it,
   because κ_obs also carries small amplitudes on characters outside K;
-- otherwise **grokked** if ``L_emp < 1e-2``, **algorithmic-but-noisy** if
-  only ``L_sym < 1e-2``, and **intermediate** if neither.
+- otherwise **grokked** if ``L_emp_test < 1e-2``, **algorithmic-but-noisy** if
+  only ``L_sym_test < 1e-2``, and **intermediate** if neither.
 """
 
 from __future__ import annotations
@@ -102,29 +107,37 @@ def dlog_offsets(p: int, dlog: dict[int, int]) -> np.ndarray:
     return (lg[:, None, None] + lg[None, :, None] - lg[None, None, :]) % (p - 1)
 
 
-def observed_kernel(logits_grid, p: int, dlog: dict[int, int]) -> np.ndarray:
+def observed_kernel(
+    logits_grid, p: int, dlog: dict[int, int], pairs: np.ndarray | None = None
+) -> np.ndarray:
     """κ_obs(d): the mean logit over all (a, b, c ≠ 0) at dlog offset d.
 
     ``logits_grid`` is the units grid, shape (p−1, p−1, ≥ p), with the vocabulary
-    on the last axis (c = 0 at index 0, which is not used).
+    on the last axis (c = 0 at index 0, which is not used). ``pairs``, a
+    (p−1, p−1) boolean mask, restricts the mean to those (a, b).
     """
     n = p - 1
     L = np.asarray(logits_grid)
     if L.shape[:2] != (n, n) or L.shape[2] < p:
         raise ValueError(f"unexpected logits_grid shape {L.shape}, expected ({n}, {n}, ≥{p})")
-    d = dlog_offsets(p, dlog).ravel()
-    total = np.bincount(d, weights=L[:, :, 1:p].astype(np.float64).ravel(), minlength=n)
-    return total / np.bincount(d, minlength=n)
+    d = dlog_offsets(p, dlog)
+    w = L[:, :, 1:p].astype(np.float64)
+    if pairs is not None:
+        d, w = d[pairs], w[pairs]
+    total = np.bincount(d.ravel(), weights=w.ravel(), minlength=n)
+    return total / np.bincount(d.ravel(), minlength=n)
 
 
-def empirical_loss(logits_grid, p: int) -> float:
-    """Mean cross-entropy over the units grid, softmax over the answer classes 0..p−1."""
+def empirical_loss(logits_grid, p: int, pairs: np.ndarray | None = None) -> float:
+    """Mean cross-entropy over the units grid (or the (a, b) in ``pairs``),
+    softmax over the answer classes 0..p−1."""
     L = np.asarray(logits_grid)[..., :p].astype(np.float64)
     a, b = np.arange(1, p)[:, None], np.arange(1, p)[None, :]
     target = (a * b) % p
     m = L.max(axis=-1, keepdims=True)
     lse = m.squeeze(-1) + np.log(np.sum(np.exp(L - m), axis=-1))
-    return float((lse - np.take_along_axis(L, target[..., None], axis=-1).squeeze(-1)).mean())
+    ce = lse - np.take_along_axis(L, target[..., None], axis=-1).squeeze(-1)
+    return float((ce if pairs is None else ce[pairs]).mean())
 
 
 # --------------------------------------------------------------------------
@@ -147,6 +160,7 @@ def crt_floor(K: Iterable[int], p: int) -> float:
 
 
 def classify_regime(K: Iterable[int], p: int, L_emp: float, L_sym: float) -> str:
+    """The regime from K and a pair of losses (:func:`kernel_noise` passes the held-out ones)."""
     K = list(K)
     if K and crt_gcd(K, p) > 1:  # an empty K (nothing learned yet) is not a CRT failure
         return "CRT-fail"
@@ -167,23 +181,26 @@ class KernelNoise:
     K: tuple[int, ...]  # support used (default: the energy support)
     L_emp: float  # model loss on the units grid
     L_sym: float  # loss of the observed kernel κ_obs
+    L_emp_test: float  # L_emp over the held-out pairs only
+    L_sym_test: float  # L_sym with κ_obs from the held-out pairs only
     L_K: float  # loss of κ_obs truncated to K
     kernel_margin: float  # κ_obs(0) − max_{d≠0} κ_obs(d)
     crt_gcd: int  # gcd(K ∪ {p−1}); > 1 means CRT failure
     crt_floor: float  # log crt_gcd, lower bound on L_K
-    regime: str  # one of REGIMES
+    regime: str  # one of REGIMES, from the held-out losses
     kappa_obs: np.ndarray  # κ_obs(d), d = 0..p−2
     kappa_K: np.ndarray  # κ_obs truncated to K
     alpha: np.ndarray  # cosine amplitudes of κ_obs
 
 
-@measure("kernel_noise", version=1)
+@measure("kernel_noise", version=2)
 def kernel_noise(S, K: Iterable[int] | None = None) -> KernelNoise:
     """Kernel/noise decomposition and regime of the model in Session ``S``.
 
     ``K`` defaults to the energy support, :func:`.characters.energy_support`.
     """
     from ..interp.bases import discrete_log_table
+    from ..interp.grids import to_units
 
     p = S.ds.p
     K = support(S, K)
@@ -198,15 +215,20 @@ def kernel_noise(S, K: Iterable[int] | None = None) -> KernelNoise:
     kappa_K = kernel_from_amplitudes(alpha, p, K={min(k, n - k) for k in K})  # cos is even
     L_emp = empirical_loss(logits, p)
     L_sym = kernel_loss(kappa_obs)
+    held_out = to_units(S.ds.test_mask, p).cpu().numpy()
+    L_emp_test = empirical_loss(logits, p, held_out)
+    L_sym_test = kernel_loss(observed_kernel(logits, p, dlog, held_out))
     return KernelNoise(
         K=K,
         L_emp=L_emp,
         L_sym=L_sym,
+        L_emp_test=L_emp_test,
+        L_sym_test=L_sym_test,
         L_K=kernel_loss(kappa_K),
         kernel_margin=kernel_margin(kappa_obs),
         crt_gcd=crt_gcd(K, p),
         crt_floor=crt_floor(K, p),
-        regime=classify_regime(K, p, L_emp, L_sym),
+        regime=classify_regime(K, p, L_emp_test, L_sym_test),
         kappa_obs=kappa_obs,
         kappa_K=kappa_K,
         alpha=alpha,
