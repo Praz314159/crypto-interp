@@ -17,6 +17,11 @@ Results are cached under ``<run>/measures/`` (see :mod:`.store`) and keyed by
 measure version, parameters and checkpoint content, so a figure over a
 population only recomputes what changed. Bump ``version`` whenever a measure's
 output changes for the same input.
+
+A *run measure* (:func:`run_measure`) is a pure function ``fn(run, **params)``
+of a whole run's training record (its loss history and the logs training
+wrote) rather than of one checkpoint's weights. It is cheap, so it is not
+cached: ``m(run)`` computes it and ``m.over(target)`` gives one row per run.
 """
 
 from __future__ import annotations
@@ -30,7 +35,7 @@ from typing import Any
 from ..runs import Run, RunSet, checkpoint_epoch
 from .store import Store
 
-REGISTRY: dict[str, Measure] = {}
+REGISTRY: dict[str, Measure | RunMeasure] = {}
 
 # Config fields that describe logging or bookkeeping rather than the run.
 _TABLE_SKIP = {"notes", "device", "log_every", "save_every", "metrics_every"}
@@ -88,6 +93,47 @@ class Measure:
                     }
                 )
         return pd.DataFrame(rows)
+
+
+@dataclass(frozen=True)
+class RunMeasure:
+    name: str
+    version: int
+    fn: Callable[..., Any]
+    result_type: type
+
+    def __call__(self, run: Run | str | Path, **params):
+        return self.fn(run if isinstance(run, Run) else Run.open(run), **params)
+
+    def over(self, target: Run | RunSet | Iterable[Run] | str | Path, **params):
+        """One row per run with the run's config and the result's scalars."""
+        import pandas as pd
+
+        rows = []
+        for run in _runs(target):
+            config = {k: v for k, v in run.config().items() if k not in _TABLE_SKIP}
+            rows.append(
+                {
+                    "run": run.id,
+                    "experiment": run.experiment,
+                    **config,
+                    **scalar_fields(self(run, **params)),
+                }
+            )
+        return pd.DataFrame(rows)
+
+
+def run_measure(name: str, version: int) -> Callable[[Callable], RunMeasure]:
+    """Register ``fn(run, **params) -> dataclass`` as a run measure."""
+
+    def wrap(fn: Callable) -> RunMeasure:
+        if name in REGISTRY:
+            raise ValueError(f"measure {name!r} is already registered")
+        m = RunMeasure(name, version, fn, _return_type(fn))
+        REGISTRY[name] = m
+        return m
+
+    return wrap
 
 
 def measure(name: str, version: int) -> Callable[[Callable], Measure]:
