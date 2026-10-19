@@ -32,7 +32,7 @@ def _measure_main(args) -> None:
     else:
         table = m.over(pop, checkpoints=args.checkpoints, **params)
     if args.out is None:
-        print(table.to_string())
+        print(table.to_string(index=False) if args.wide else _results_only(table, pop, args))
         return
     args.out.parent.mkdir(parents=True, exist_ok=True)
     if args.out.suffix == ".parquet":
@@ -40,6 +40,14 @@ def _measure_main(args) -> None:
     else:
         table.to_csv(args.out, index=False)
     print(f"{len(table)} rows" + (f" → {args.out}" if args.out else ""))
+
+
+def _results_only(table, pop, args) -> str:
+    """The table without the run config columns, for reading in a terminal."""
+    config = {"experiment", "epoch"}.union(*(r.config() for r in pop))
+    keep = ["run"] + (["epoch"] if args.checkpoints == "all" else [])
+    keep += [c for c in table.columns if c not in config and c != "run"]
+    return table[keep].to_string(index=False)
 
 
 def _figure_main(args) -> None:
@@ -129,6 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--checkpoints", choices=["latest", "all"], default="latest")
     m.add_argument("--param", action="append", default=[], metavar="KEY=VALUE")
     m.add_argument("--out", type=Path, help=".csv or .parquet (default: print)")
+    m.add_argument("--wide", action="store_true", help="also print the run config columns")
     m.set_defaults(func=_measure_main)
 
     f = sub.add_parser("figure", help="draw a figure (`figure list` shows them)")

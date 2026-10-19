@@ -74,3 +74,10 @@ def test_sweep_then_measure_and_figure(root, tmp_path, capsys):
 
     main(["runs", "ls", "--root", str(root)])
     assert "m16_seed2" in capsys.readouterr().out
+
+    # printed tables drop the config columns unless --wide
+    main(["measure", "grok_status", "--root", str(root), "--where", "d_mlp=8"])
+    head = capsys.readouterr().out.splitlines()[0].split()
+    assert head[0] == "run" and "d_mlp" not in head and "status" in head
+    main(["measure", "grok_status", "--root", str(root), "--where", "d_mlp=8", "--wide"])
+    assert "d_mlp" in capsys.readouterr().out.splitlines()[0].split()
