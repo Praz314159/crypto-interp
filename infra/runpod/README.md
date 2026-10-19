@@ -35,7 +35,7 @@ Launch from the web console (Pods → Deploy) with the spec above, or run
 POD="root@<pod-id>.runpod.io"   # adjust to the real host/port
 
 # 1. (Optional) upload existing run dirs so finished seeds are skipped —
-#    the sweep script is idempotent on >10-checkpoint runs:
+#    the sweep skips runs that already finished:
 rsync -az --relative experiments/./004_p127/runs experiments/./005_p181/runs \
     "$POD":/workspace/crypto-interp/experiments/
 

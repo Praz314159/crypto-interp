@@ -8,9 +8,9 @@ characters) -- a sharp, falsifiable contrast with the up-to-4-step chains at
 p=113. Architecture mirrors the p=113 helper analysis (d_model=24) so K and
 helper pairs are directly comparable.
 
-run_dmlp_seed_sweep.py overrides d_mlp and seed per child run:
-    python experiments/003_dmodel_sweep_p113/scripts/run_dmlp_seed_sweep.py \
-        --experiment 004_p127 --d-mlps 32,128 --seeds 1,2,3 --epochs 40000
+Sweep d_mlp and seeds:
+    crypto-interp sweep --experiment 004_p127 --set d_model=24 --grid d_mlp=32,128 \
+        --seeds 1..3 --num-epochs 40000
 Analyze the runs with the measures, e.g. the primary/helper split:
     from crypto_interp import measures, runs
     measures.helpers.over(runs.query(experiment="004"))

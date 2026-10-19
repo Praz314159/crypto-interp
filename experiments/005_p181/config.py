@@ -12,9 +12,9 @@ Architecture mirrors p=113/p=127 (d_model=24) for comparability. The detector is
 now fold-aware (n=180 folds frequencies >90), so doublings whose raw index 2k>90
 are still labeled correctly.
 
-Run a clean, correctly-tagged sweep with the driver:
-    python experiments/003_dmodel_sweep_p113/scripts/run_dmlp_seed_sweep.py \
-        --experiment 005_p181 --d-mlps 32 --seeds 1,2,3 --epochs 50000
+Sweep:
+    crypto-interp sweep --experiment 005_p181 --set d_model=24 --set d_mlp=32 \
+        --seeds 1..3 --num-epochs 50000
 Analyze the runs with the measures, e.g. the primary/helper split:
     from crypto_interp import measures, runs
     measures.helpers.over(runs.query(experiment="005"))

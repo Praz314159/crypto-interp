@@ -1,14 +1,13 @@
 """Config for experiment 003: d_model sweep for mul mod 113.
 
-Baseline values mirror experiment 001. The d_model value is overridden
-per-run by `scripts/run_sweep.py`, which iterates over a planned set and
-launches `scripts/train.py --override d_model=<N> --tag dmodel_<N>` for
-each.
+Baseline values mirror experiment 001. Runs override d_model (and d_mlp,
+weight_decay, seed) per run, e.g.:
 
-Why a sweep config rather than separate experiments per d_model: keeping
-the d_model variants under a single experiment id lets all runs share a
-dataset cache and a runs/ tree, and the comparison plots have a natural
-home in figures/.
+    crypto-interp sweep --experiment 003_dmodel_sweep_p113 --seeds 1..21 \
+        --set d_model=24 --set d_mlp=20 --set weight_decay=2
+
+Keeping the variants under one experiment id gives them one runs/ tree;
+the run index selects among them by config.
 """
 
 from crypto_interp.training import ExperimentConfig

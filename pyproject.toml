@@ -21,6 +21,9 @@ dependencies = [
     "pyarrow>=14",
 ]
 
+[project.scripts]
+crypto-interp = "crypto_interp.cli:main"
+
 [project.optional-dependencies]
 # ruff is pinned exactly so local and CI format identically.
 dev = ["pytest>=8", "ruff==0.17.1"]

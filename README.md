@@ -25,15 +25,13 @@ experiments/                    one dir per concrete experiment
     figures/                    plots (gitignored)
     scripts/                    experiment-specific analysis scripts
 
-scripts/                        global CLI entry points
-  train.py                      python scripts/train.py --experiment 001_mul_p113
-  sweep.py                      python scripts/sweep.py --experiment 001_mul_p113 --seeds 0..15
 ```
 
 ## Setup
 
 ```bash
 pip install -e .
+crypto-interp --help        # train, sweep, runs, measure, figure
 ```
 
 ## Conventions
