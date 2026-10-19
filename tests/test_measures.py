@@ -75,6 +75,24 @@ def test_changed_checkpoint_invalidates(run_dir):
     assert len(CALLS) == 2
 
 
+def test_entries_with_stale_fields_are_recomputed(run_dir):
+    """An entry written by an earlier form of the result type (same version,
+    different fields) is a miss, and the fresh result replaces it."""
+    import json
+
+    ckpt = checkpoint_paths(run_dir)[0]
+    probe.at(ckpt)
+    (entry,) = (run_dir / "measures" / "_test_probe" / "v1").glob("*.json")
+    meta = json.loads(entry.read_text())
+    del meta["ks"]
+    meta["retired_field"] = 0
+    entry.write_text(json.dumps(meta))
+
+    assert probe.at(ckpt).ks == (1, 2)
+    assert probe.at(ckpt).ks == (1, 2)
+    assert CALLS == [1.0, 1.0]  # recomputed once, then cached again
+
+
 def test_over_runs_and_trajectories(tmp_path):
     cfg = dict(
         task="mul",
