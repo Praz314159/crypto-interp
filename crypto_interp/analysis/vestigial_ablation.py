@@ -9,11 +9,11 @@ Usage:
     python experiments/003_dmodel_sweep_p113/scripts/analyze_vestigial_ablation.py \
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1
 """
+
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
-
 
 from crypto_interp.interp import char_index, essential_characters, load_run
 
@@ -38,19 +38,24 @@ def main():
     print(f"per-K energies: {energies}")
     print(f"\nBaseline test loss: {base:.4e}")
 
-    print(f"\n{'k':>4} {'order':>5} {'energy':>10} {'ablated test':>14} "
-          f"{'Δlog10':>8}  interpretation")
+    print(
+        f"\n{'k':>4} {'order':>5} {'energy':>10} {'ablated test':>14} {'Δlog10':>8}  interpretation"
+    )
     for k in K:
         v = per[k]
-        print(f"{k:>4} {v['order']:>5} {v['energy']:>10.3f} {v['ablated_loss']:>14.4e} "
-              f"{v['dlog10']:>+8.3f}  {v['cls']}")
+        print(
+            f"{k:>4} {v['order']:>5} {v['energy']:>10.3f} {v['ablated_loss']:>14.4e} "
+            f"{v['dlog10']:>+8.3f}  {v['cls']}"
+        )
 
     # Control: ablate the strongest non-K character.
     non_K = [k for k in ci.freqs if k not in set(K)]
     ctrl_k = max(non_K, key=lambda k: per[k]["energy"])
     cv = per[ctrl_k]
-    print(f"\nControl: ablate top non-K char k={ctrl_k} (energy {cv['energy']:.3f}): "
-          f"test loss {cv['ablated_loss']:.4e}  Δlog10={cv['dlog10']:+.3f}")
+    print(
+        f"\nControl: ablate top non-K char k={ctrl_k} (energy {cv['energy']:.3f}): "
+        f"test loss {cv['ablated_loss']:.4e}  Δlog10={cv['dlog10']:+.3f}"
+    )
 
 
 if __name__ == "__main__":

@@ -35,8 +35,9 @@ import torch
 
 
 class Session:
-    def __init__(self, model, ds, task: Optional[str] = None,
-                 basis: Optional[torch.Tensor] = None, ci=None):
+    def __init__(
+        self, model, ds, task: Optional[str] = None, basis: Optional[torch.Tensor] = None, ci=None
+    ):
         self.model = model
         self.ds = ds
         self.task = task or getattr(ds, "task", "mul")
@@ -47,8 +48,10 @@ class Session:
             if self.task != "mul":
                 raise ValueError(
                     f"Session has no default basis for task {self.task!r} (only 'mul'); "
-                    "pass basis= and ci= explicitly")
+                    "pass basis= and ci= explicitly"
+                )
             from .bases import char_index
+
             basis, ci = char_index(ds.p)
         self.basis = basis
         self.ci = ci
@@ -61,7 +64,8 @@ class Session:
     @classmethod
     def from_run(cls, run_dir, device: str = "cpu") -> "Session":
         """Load model + dataset from a run directory; build basis/char_index from ds.p."""
-        from .load import load_run, latest_checkpoint
+        from .load import latest_checkpoint, load_run
+
         model, ds, _ = load_run(latest_checkpoint(run_dir), device=device)
         return cls(model, ds)
 
@@ -72,6 +76,7 @@ class Session:
         """Full ``p²``-grid :class:`ActivationCache` (one forward pass, reused)."""
         if self._cache is None:
             from .activations import cache_all
+
             self._cache = cache_all(self.model, self.ds)
         return self._cache
 
@@ -80,6 +85,7 @@ class Session:
         """``(p-1, p-1, vocab)`` answer-position logits over the (a, b) grid."""
         if self._logits_grid is None:
             from .grids import compute_logits_grid
+
             self._logits_grid = compute_logits_grid(self.model, self.ds)
         return self._logits_grid
 
@@ -88,6 +94,7 @@ class Session:
     def char_energy(self, W: Optional[torch.Tensor] = None) -> np.ndarray:
         """Per-character energy of ``W`` (defaults to W_E) in the natural basis."""
         from .metrics import char_energy
+
         if W is None:
             W = self.model.embed.W_E[:, : self.ds.p].detach()
         return char_energy(W, self.basis, self.ci)
@@ -95,24 +102,28 @@ class Session:
     def essential(self, threshold: float = 0.05) -> dict:
         """Essential characters K + per-char ablation (energy, ablated loss, Δlog10, class)."""
         from .ablate import essential_characters
-        return essential_characters(self.model, self.ds, self.ci, self.basis,
-                                    threshold=threshold)
+
+        return essential_characters(self.model, self.ds, self.ci, self.basis, threshold=threshold)
 
     def helpers(self, K=None, max_mult: int = 8) -> list:
         """Primary/helper classification on K: ``[(helper_k, primary_m, mult, energy), ...]``."""
         from .harmonic import find_primary_helper_pairs
+
         if K is None:
             K = self.essential()["K"]
-        return find_primary_helper_pairs(self.model, self.ds, self.ci, self.basis,
-                                         K, max_mult=max_mult)
+        return find_primary_helper_pairs(
+            self.model, self.ds, self.ci, self.basis, K, max_mult=max_mult
+        )
 
     def delta_k_spectrum(self, k: int):
         """Δ_k(Δlog) 1-D reduction + Fourier spectrum + dominant freq. See ``harmonic.py``."""
         from .harmonic import delta_k_spectrum
+
         return delta_k_spectrum(self.model, self.ds, self.ci, self.basis, k)
 
     def order(self, k: int) -> int:
         from .metrics import order_of
+
         return order_of(k, self.ds.p)
 
     # ---------- mech-interp-discovered verbs ----------
@@ -121,10 +132,14 @@ class Session:
         """``(char_E[d_mlp, n_chars], dominant_char[d_mlp])``; cached after first call."""
         if self._dom is None:
             from .neurons import per_neuron_dominant_char
+
             self._dom = per_neuron_dominant_char(
                 self.model.unembed.W_U.detach(),
                 self.model.blocks[0].mlp.W_out.detach(),
-                self.basis, self.ci, self.ds.p)
+                self.basis,
+                self.ci,
+                self.ds.p,
+            )
         return self._dom
 
     def cluster_sizes(self, K=None) -> dict[int, int]:
@@ -142,6 +157,7 @@ class Session:
         unembed's χ_k read direction, or None if no neurons dominate at k.
         """
         from .neurons import cluster_signal as _cs
+
         _, dom = self.per_neuron_dominant_char()
         cluster = np.where(dom == k)[0]
         if len(cluster) == 0:
@@ -155,6 +171,7 @@ class Session:
     def reference_signal(self, k: int) -> np.ndarray:
         """Algebraic reference ``cos(θ_k(a) + θ_k(b))`` over the (a, b) grid."""
         from .neurons import reference_cos_signal
+
         return reference_cos_signal(k, self.ds.p)
 
     # ---------- metrics and forward verbs ----------
@@ -162,16 +179,19 @@ class Session:
     def evaluate(self) -> tuple[float, float, float]:
         """``(train_loss, test_loss, accuracy)`` at current weights."""
         from .ablate import evaluate_loss
+
         return evaluate_loss(self.model, self.ds)
 
     def run_with_cache(self, inputs: torch.Tensor):
         """Forward + full cache; returns ``(logits, ActivationCache)``."""
         from .activations import run_with_cache
+
         return run_with_cache(self.model, inputs)
 
     def test_loss_metric(self, logits: torch.Tensor) -> float:
         """Standard patching metric: test-set cross-entropy at the final answer position."""
         import torch.nn.functional as F
+
         tm = self.ds.test_mask
         y = self.ds.labels[tm]
         lg = logits[:, -1, : self.ds.n_answer_tokens][tm].double()
@@ -186,18 +206,22 @@ class Session:
         explicitly otherwise. Returns a dict ``{"bifurcation", "commit", "cliff",
         "K", "epochs"}``.
         """
-        from .dynamics import bifurcation_step, commit_step, cliff_step
+        from .dynamics import bifurcation_step, cliff_step, commit_step
+
         if metrics_path is None:
             raise ValueError("metrics_path required (point at the run's metrics.pt)")
         M = torch.load(metrics_path, weights_only=False)
         L = torch.load(Path(metrics_path).with_name("losses.pt"), weights_only=False)
-        ep = np.asarray(M["epochs"]); fe = np.asarray(M["freq_energies"])
+        ep = np.asarray(M["epochs"])
+        fe = np.asarray(M["freq_energies"])
         te = np.asarray(L["test_losses"])
         n_chars = max(self.ci.freqs)
         final = fe[-1]
         K = sorted(int(k) for k in self.ci.freqs if final[k - 1] >= 0.05 * final.max())
-        Km = np.zeros(n_chars, bool); Km[[k - 1 for k in K]] = True
-        bi = bifurcation_step(fe, Km, 1.5); co = commit_step(fe, K, "subset")
+        Km = np.zeros(n_chars, bool)
+        Km[[k - 1 for k in K]] = True
+        bi = bifurcation_step(fe, Km, 1.5)
+        co = commit_step(fe, K, "subset")
         cl = cliff_step(te, 0.1)
         return {
             "K": K,

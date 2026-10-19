@@ -12,6 +12,7 @@ Usage:
     python -m crypto_interp.analysis.cross_prime_kernel_noise \\
         --out-dir outputs/cross_prime_kernel_noise/all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,7 +26,6 @@ import numpy as np
 from crypto_interp.interp import Session
 from crypto_interp.interp.theory import theory_baseline
 
-
 PRIME_RUNS = {
     113: "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed*",
     127: "experiments/004_p127/runs/dmodel_24_dmlp_32_seed[0-9]*",
@@ -38,7 +38,8 @@ def prime_factorize(n: int) -> list[tuple[int, int]]:
     while d * d <= n:
         e = 0
         while n % d == 0:
-            n //= d; e += 1
+            n //= d
+            e += 1
         if e:
             out.append((d, e))
         d += 1
@@ -131,8 +132,7 @@ def main():
 
     all_rows = []
     for p, pattern in PRIME_RUNS.items():
-        dirs = sorted(d for d in glob.glob(pattern)
-                      if Path(d).is_dir() and not d.endswith(".log"))
+        dirs = sorted(d for d in glob.glob(pattern) if Path(d).is_dir() and not d.endswith(".log"))
         print(f"[p={p}]  {len(dirs)} dirs")
         for d in dirs:
             r = analyze_one(Path(d))
@@ -159,25 +159,50 @@ def main():
         # Algebraic-floor check
         nong = [r for r in rows if r["regime"] != "grokked"]
         if nong:
-            print(f"  non-grokked seeds: predicted vs observed L_sym floor:")
+            print("  non-grokked seeds: predicted vs observed L_sym floor:")
             for r in sorted(nong, key=lambda r: -r["predicted_floor"]):
-                print(f"    {Path(r['run_dir']).name:42s}  "
-                      f"K={r['K']}  pred={r['predicted_floor']:.4g}  "
-                      f"L_sym={r['L_sym']:.4g}  L_emp={r['L_emp']:.4g}  "
-                      f"[{r['regime']}]")
+                print(
+                    f"    {Path(r['run_dir']).name:42s}  "
+                    f"K={r['K']}  pred={r['predicted_floor']:.4g}  "
+                    f"L_sym={r['L_sym']:.4g}  L_emp={r['L_emp']:.4g}  "
+                    f"[{r['regime']}]"
+                )
 
     # CSV
     csv_path = out_dir / "cross_prime_kernel_noise.csv"
     with csv_path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["p", "run_dir", "regime", "test_loss_eval", "accuracy_eval",
-                    "|K|", "K", "L_emp", "L_sym", "kernel_margin",
-                    "predicted_floor"])
+        w.writerow(
+            [
+                "p",
+                "run_dir",
+                "regime",
+                "test_loss_eval",
+                "accuracy_eval",
+                "|K|",
+                "K",
+                "L_emp",
+                "L_sym",
+                "kernel_margin",
+                "predicted_floor",
+            ]
+        )
         for r in all_rows:
-            w.writerow([r["p"], r["run_dir"], r["regime"], r["test_loss_eval"],
-                        r["accuracy_eval"], r["|K|"], " ".join(map(str, r["K"])),
-                        r["L_emp"], r["L_sym"], r["kernel_margin"],
-                        r["predicted_floor"]])
+            w.writerow(
+                [
+                    r["p"],
+                    r["run_dir"],
+                    r["regime"],
+                    r["test_loss_eval"],
+                    r["accuracy_eval"],
+                    r["|K|"],
+                    " ".join(map(str, r["K"])),
+                    r["L_emp"],
+                    r["L_sym"],
+                    r["kernel_margin"],
+                    r["predicted_floor"],
+                ]
+            )
     print(f"\nWrote {csv_path}")
 
     # Plots
@@ -190,8 +215,12 @@ def plot_population(rows: list[dict], out_dir: Path) -> None:
 
     ax = axes[0]
     color_by_p = {113: "C0", 127: "C1", 181: "C2"}
-    marker_by_regime = {"grokked": "o", "algorithmic-but-noisy": "s",
-                        "CRT-fail": "x", "intermediate": "^"}
+    marker_by_regime = {
+        "grokked": "o",
+        "algorithmic-but-noisy": "s",
+        "CRT-fail": "x",
+        "intermediate": "^",
+    }
     for p in [113, 127, 181]:
         for reg in ["grokked", "algorithmic-but-noisy", "CRT-fail", "intermediate"]:
             sel = [r for r in rows if r["p"] == p and r["regime"] == reg]
@@ -199,14 +228,24 @@ def plot_population(rows: list[dict], out_dir: Path) -> None:
                 continue
             xs = np.clip([r["L_sym"] for r in sel], 1e-10, None)
             ys = np.clip([r["L_emp"] for r in sel], 1e-10, None)
-            ax.scatter(xs, ys, c=color_by_p[p], marker=marker_by_regime[reg],
-                       s=60, alpha=0.75, edgecolor="black", linewidth=0.4,
-                       label=f"p={p} {reg}")
+            ax.scatter(
+                xs,
+                ys,
+                c=color_by_p[p],
+                marker=marker_by_regime[reg],
+                s=60,
+                alpha=0.75,
+                edgecolor="black",
+                linewidth=0.4,
+                label=f"p={p} {reg}",
+            )
     # y = x reference
     lim = (1e-10, 10)
     ax.plot(lim, lim, "k--", alpha=0.3, label="y = x")
-    ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlim(*lim); ax.set_ylim(*lim)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(*lim)
+    ax.set_ylim(*lim)
     ax.set_xlabel("L_symmetric (algorithm)")
     ax.set_ylabel("L_empirical (model behavior)")
     ax.set_title("Cross-prime regime scatter")
@@ -216,14 +255,23 @@ def plot_population(rows: list[dict], out_dir: Path) -> None:
     # 2. Predicted floor vs observed L_sym at non-grokked seeds
     ax = axes[1]
     for p in [113, 127, 181]:
-        sel = [r for r in rows if r["p"] == p and r["regime"] != "grokked"
-               and r["predicted_floor"] > 0]
+        sel = [
+            r for r in rows if r["p"] == p and r["regime"] != "grokked" and r["predicted_floor"] > 0
+        ]
         if not sel:
             continue
         xs = [r["predicted_floor"] for r in sel]
         ys = [r["L_sym"] for r in sel]
-        ax.scatter(xs, ys, c=color_by_p[p], s=80, alpha=0.85,
-                   edgecolor="black", linewidth=0.4, label=f"p={p}")
+        ax.scatter(
+            xs,
+            ys,
+            c=color_by_p[p],
+            s=80,
+            alpha=0.85,
+            edgecolor="black",
+            linewidth=0.4,
+            label=f"p={p}",
+        )
         # Annotate with seed numbers
         for r in sel:
             seed = Path(r["run_dir"]).name.split("seed")[-1]

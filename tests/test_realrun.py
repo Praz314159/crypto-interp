@@ -1,5 +1,6 @@
 """Regression tests against the documented harmonic-helper findings (note 06),
 on the committed reference model."""
+
 import torch
 
 from crypto_interp.interp import (
@@ -23,7 +24,10 @@ def test_essential_characters_and_helper_pairs(loaded_run):
     assert {3, 6, 10, 20, 51} <= lb
 
     K_aug = sorted(set(res["K"]) | lb)
-    pairs = {(h, prim): mult for h, prim, mult, _e in find_primary_helper_pairs(model, ds, ci, basis, K_aug)}
+    pairs = {
+        (h, prim): mult
+        for h, prim, mult, _e in find_primary_helper_pairs(model, ds, ci, basis, K_aug)
+    }
     # the Sylow-2 doubling helpers documented in note 06, with fold-aware mult=2
     assert (6, 3) in pairs and pairs[(6, 3)] == 2
     assert (20, 10) in pairs and pairs[(20, 10)] == 2

@@ -64,8 +64,9 @@ def hooks(model, fwd_hooks: Sequence[tuple[HookKey, HookFn]]):
 
 
 @torch.no_grad()
-def run_with_hooks(model, inputs: torch.Tensor,
-                   fwd_hooks: Sequence[tuple[HookKey, HookFn]]) -> torch.Tensor:
+def run_with_hooks(
+    model, inputs: torch.Tensor, fwd_hooks: Sequence[tuple[HookKey, HookFn]]
+) -> torch.Tensor:
     """Run forward with hooks attached, then clean up. Returns logits."""
     with hooks(model, fwd_hooks):
         return model(inputs)
@@ -73,30 +74,39 @@ def run_with_hooks(model, inputs: torch.Tensor,
 
 # ---------- intervention factories (closures that produce hook fns) ----------
 
+
 def zero_hook(slicer: tuple | None = None) -> HookFn:
     """Hook that zeros out the activation (or the slice indexed by ``slicer``).
 
     ``slicer`` is an indexing tuple suitable for tensor ``__getitem__`` (e.g.,
     ``(slice(None), -1)`` to zero only the final position).
     """
+
     def _h(act: torch.Tensor, name: str):
         if slicer is None:
             return torch.zeros_like(act)
         out = act.clone()
         out[slicer] = 0
         return out
+
     return _h
 
 
 def patch_hook(value: torch.Tensor, slicer: tuple | None = None) -> HookFn:
     """Hook that replaces the activation (or a slice) with ``value``."""
+
     def _h(act: torch.Tensor, name: str):
         if slicer is None:
             return value.to(act.dtype).to(act.device)
         out = act.clone()
-        v = value[slicer] if (isinstance(value, torch.Tensor) and value.shape == act.shape) else value
+        v = (
+            value[slicer]
+            if (isinstance(value, torch.Tensor) and value.shape == act.shape)
+            else value
+        )
         out[slicer] = v
         return out
+
     return _h
 
 
@@ -110,10 +120,12 @@ def project_hook(basis: torch.Tensor, keep_mask: torch.Tensor) -> HookFn:
 
     Activation shape ``(..., d)`` → coefficients ``(..., k)`` → masked → reconstructed ``(..., d)``.
     """
+
     def _h(act: torch.Tensor, name: str):
         b = basis.to(act.dtype).to(act.device)
         m = keep_mask.to(act.dtype).to(act.device)
         coef = torch.einsum("kd,...d->...k", b, act)
         coef = coef * m
         return torch.einsum("kd,...k->...d", b, coef)
+
     return _h

@@ -23,8 +23,8 @@ def test_ablate_character_zeros_energy_and_matches_project_back():
     ce = char_energy(W_ab, basis, ci)
     ce0 = char_energy(W, basis, ci)
 
-    assert ce[k - 1] < 1e-9                       # character k removed
-    for kk in ci.freqs:                            # others untouched
+    assert ce[k - 1] < 1e-9  # character k removed
+    for kk in ci.freqs:  # others untouched
         if kk != k:
             assert abs(ce[kk - 1] - ce0[kk - 1]) < 1e-6
 

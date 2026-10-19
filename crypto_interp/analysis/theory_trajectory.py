@@ -21,6 +21,7 @@ Or for a small population (figures saved to --out-dir):
         --tag dmodel_24_dmlp_20_wd2 \\
         --out-dir outputs/theory_trajectory/003_dmodel_sweep_p113
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,7 +34,6 @@ import numpy as np
 from crypto_interp.interp import Session
 from crypto_interp.interp.load import load_run
 from crypto_interp.interp.theory import theory_baseline
-
 
 CKPT_RE = re.compile(r"checkpoint_(\d+)\.pt$")
 
@@ -76,9 +76,11 @@ def analyze_trajectory(run_dir: Path) -> dict:
         L_K.append(r["L_theory_K"])
         K_sizes.append(len(r["K"]))
         K_sets.append(tuple(sorted(int(k) for k in r["K"])))
-        print(f"  step {step:>6}: |K|={len(r['K']):>2} K={list(r['K'])} "
-              f" L_emp={r['L_empirical']:.3g}  L_sym={r['L_symmetric']:.3g}  "
-              f"L_K={r['L_theory_K']:.3g}")
+        print(
+            f"  step {step:>6}: |K|={len(r['K']):>2} K={list(r['K'])} "
+            f" L_emp={r['L_empirical']:.3g}  L_sym={r['L_symmetric']:.3g}  "
+            f"L_K={r['L_theory_K']:.3g}"
+        )
     return {
         "step": np.array(steps),
         "L_emp": np.array(L_emp),
@@ -91,12 +93,30 @@ def analyze_trajectory(run_dir: Path) -> dict:
 
 
 def plot_one(traj: dict, ax, *, title: str | None = None) -> None:
-    ax.semilogy(traj["step"], np.clip(traj["L_emp"], 1e-9, None),
-                "o-", label="L_empirical", color="C0", markersize=4)
-    ax.semilogy(traj["step"], np.clip(traj["L_sym"], 1e-9, None),
-                "s-", label="L_symmetric (algorithm)", color="C1", markersize=4)
-    ax.semilogy(traj["step"], np.clip(traj["L_K"], 1e-9, None),
-                "^-", label="L_theory_K (truncated)", color="C2", markersize=3)
+    ax.semilogy(
+        traj["step"],
+        np.clip(traj["L_emp"], 1e-9, None),
+        "o-",
+        label="L_empirical",
+        color="C0",
+        markersize=4,
+    )
+    ax.semilogy(
+        traj["step"],
+        np.clip(traj["L_sym"], 1e-9, None),
+        "s-",
+        label="L_symmetric (algorithm)",
+        color="C1",
+        markersize=4,
+    )
+    ax.semilogy(
+        traj["step"],
+        np.clip(traj["L_K"], 1e-9, None),
+        "^-",
+        label="L_theory_K (truncated)",
+        color="C2",
+        markersize=3,
+    )
     ax.set_xlabel("training step")
     ax.set_ylabel("CE (log scale)")
     ax.set_title(title or Path(traj["run_dir"]).name)
@@ -115,16 +135,25 @@ def plot_K_size(traj: dict, ax, *, title: str | None = None) -> None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-dir", default=None,
-                    help="Single run directory (alternative to --seeds / --tag).")
-    ap.add_argument("--runs-root", default="experiments/003_dmodel_sweep_p113/runs",
-                    help="Used with --seeds and --tag.")
-    ap.add_argument("--tag", default="dmodel_24_dmlp_20_wd2",
-                    help="Run-name prefix; full name = '{tag}_seed{N}'.")
-    ap.add_argument("--seeds", nargs="+", type=int, default=None,
-                    help="Seed numbers to plot.")
-    ap.add_argument("--out-dir", default="outputs/theory_trajectory/003_dmodel_sweep_p113",
-                    help="Where to save figures and CSVs.")
+    ap.add_argument(
+        "--run-dir", default=None, help="Single run directory (alternative to --seeds / --tag)."
+    )
+    ap.add_argument(
+        "--runs-root",
+        default="experiments/003_dmodel_sweep_p113/runs",
+        help="Used with --seeds and --tag.",
+    )
+    ap.add_argument(
+        "--tag",
+        default="dmodel_24_dmlp_20_wd2",
+        help="Run-name prefix; full name = '{tag}_seed{N}'.",
+    )
+    ap.add_argument("--seeds", nargs="+", type=int, default=None, help="Seed numbers to plot.")
+    ap.add_argument(
+        "--out-dir",
+        default="outputs/theory_trajectory/003_dmodel_sweep_p113",
+        help="Where to save figures and CSVs.",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -146,9 +175,10 @@ def main():
         traj = analyze_trajectory(r)
         trajs.append(traj)
         # Save numeric arrays as .npz; save K_sets separately as a small text log
-        np.savez(out_dir / f"{r.name}.npz", **{
-            k: v for k, v in traj.items() if k not in ("run_dir", "K_sets")
-        })
+        np.savez(
+            out_dir / f"{r.name}.npz",
+            **{k: v for k, v in traj.items() if k not in ("run_dir", "K_sets")},
+        )
         with open(out_dir / f"{r.name}.K_trajectory.txt", "w") as f:
             for step, ks in zip(traj["step"], traj["K_sets"]):
                 f.write(f"{int(step):>6}  K={list(ks)}\n")
@@ -166,8 +196,7 @@ def main():
     if len(trajs) > 1:
         cols = min(4, len(trajs))
         rows = (len(trajs) + cols - 1) // cols
-        fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3.2 * rows),
-                                 squeeze=False)
+        fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3.2 * rows), squeeze=False)
         for i, t in enumerate(trajs):
             ax = axes[i // cols][i % cols]
             plot_one(t, ax, title=Path(t["run_dir"]).name)

@@ -23,8 +23,8 @@ def test_char_index_layout(p):
 
 
 def test_order_of():
-    assert order_of(56, 113) == 2     # Legendre / quadratic-residue character
-    assert order_of(16, 113) == 7     # pure Sylow-7
+    assert order_of(56, 113) == 2  # Legendre / quadratic-residue character
+    assert order_of(16, 113) == 7  # pure Sylow-7
     assert order_of(1, 113) == 112
     assert order_of(3, 113) == 112
-    assert order_of(7, 127) == 18     # 126 // gcd(7,126)=126//7
+    assert order_of(7, 127) == 18  # 126 // gcd(7,126)=126//7

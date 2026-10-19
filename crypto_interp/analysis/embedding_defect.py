@@ -21,6 +21,7 @@ Usage:
     python -m crypto_interp.analysis.embedding_defect \\
         --out-dir outputs/embedding_defect/all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -31,10 +32,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from crypto_interp.analysis.error_localization import analyze_run
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.analysis.error_localization import analyze_run
-
 
 PRIME_RUNS = {
     113: "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed*",
@@ -71,19 +71,19 @@ def clock_residuals(S: Session, K: list[int]) -> dict:
     dlog = np.array([dlog_map[x] for x in range(1, p)])  # token x = 1..p-1
 
     W = S.model.embed.W_E.detach().double().numpy()[:, 1:p]  # (d_model, n)
-    theta = TAU * np.outer(K, dlog) / n                       # (|K|, n)
+    theta = TAU * np.outer(K, dlog) / n  # (|K|, n)
     Phi = np.concatenate([np.cos(theta), np.sin(theta)], axis=0)  # (2|K|, n)
-    B, *_ = np.linalg.lstsq(Phi.T, W.T, rcond=None)           # (2|K|, d_model)
-    ideal = B.T @ Phi                                          # (d_model, n)
+    B, *_ = np.linalg.lstsq(Phi.T, W.T, rcond=None)  # (2|K|, d_model)
+    ideal = B.T @ Phi  # (d_model, n)
 
     # Per-plane deviation distance (for attributing a defect to a clock).
     plane_dev = np.zeros((len(K), n))
     for j, k in enumerate(K):
-        C, Sv = B[j], B[len(K) + j]                # the realized plane of χ_k
+        C, Sv = B[j], B[len(K) + j]  # the realized plane of χ_k
         e1 = C / (np.linalg.norm(C) + 1e-12)
         s = Sv - (Sv @ e1) * e1
         e2 = s / (np.linalg.norm(s) + 1e-12)
-        P = np.stack([e1, e2])                     # (2, d_model)
+        P = np.stack([e1, e2])  # (2, d_model)
         act = P @ W
         idl = P @ (np.outer(C, np.cos(theta[j])) + np.outer(Sv, np.sin(theta[j])))
         plane_dev[j] = np.linalg.norm(act - idl, axis=0)
@@ -91,13 +91,11 @@ def clock_residuals(S: Session, K: list[int]) -> dict:
     # Total in-subspace deviation, signal-normalized: how far the token sits
     # from its ideal position *within* the span of the K planes. Plane
     # weighting is automatic (strong planes contribute proportionally).
-    Q, _ = np.linalg.qr(B.T)                       # (d_model, 2|K|) orthonormal
+    Q, _ = np.linalg.qr(B.T)  # (d_model, 2|K|) orthonormal
     resid = W - ideal
-    in_dev = (np.linalg.norm(Q.T @ resid, axis=0)
-              / (np.linalg.norm(ideal, axis=0) + 1e-12))
+    in_dev = np.linalg.norm(Q.T @ resid, axis=0) / (np.linalg.norm(ideal, axis=0) + 1e-12)
     # Out-of-K residual fraction (the previously falsified leakage measure).
-    leak = (np.linalg.norm(resid - Q @ (Q.T @ resid), axis=0)
-            / (np.linalg.norm(W, axis=0) + 1e-12))
+    leak = np.linalg.norm(resid - Q @ (Q.T @ resid), axis=0) / (np.linalg.norm(W, axis=0) + 1e-12)
     return {"in_dev": in_dev, "plane_dev": plane_dev, "leak": leak}
 
 
@@ -120,37 +118,56 @@ def analyze_population(pattern: str, p_expect: int) -> list[dict]:
         margin = err["margin"]
         min_margin = np.minimum(margin.min(axis=1), margin.min(axis=0))
         worst_idx = geo["plane_dev"].argmax(axis=0)
-        regime = ("grokked" if err["n_wrong"] == 0 else
-                  "noisy" if err["accuracy"] > 0.9 else "failed")
+        regime = (
+            "grokked" if err["n_wrong"] == 0 else "noisy" if err["accuracy"] > 0.9 else "failed"
+        )
         for x in range(1, p):
             i = x - 1
-            rows.append({
-                "p": p, "run": run.name, "regime": regime,
-                "n_wrong_run": err["n_wrong"], "K": " ".join(map(str, K)),
-                "token": x,
-                "err_a": float(err["err_by_a"][i]),
-                "err_b": float(err["err_by_b"][i]),
-                "min_margin": float(min_margin[i]),
-                "in_dev": float(geo["in_dev"][i]),
-                "worst_k": int(K[worst_idx[i]]),
-                "leak": float(geo["leak"][i]),
-            })
+            rows.append(
+                {
+                    "p": p,
+                    "run": run.name,
+                    "regime": regime,
+                    "n_wrong_run": err["n_wrong"],
+                    "K": " ".join(map(str, K)),
+                    "token": x,
+                    "err_a": float(err["err_by_a"][i]),
+                    "err_b": float(err["err_by_b"][i]),
+                    "min_margin": float(min_margin[i]),
+                    "in_dev": float(geo["in_dev"][i]),
+                    "worst_k": int(K[worst_idx[i]]),
+                    "leak": float(geo["leak"][i]),
+                }
+            )
         err_rate = np.maximum(err["err_by_a"], err["err_by_b"])
         med_dev = float(np.median(geo["in_dev"]))
+
         # rank correlation between in-subspace deviation and error rate
         def ranks(v):
-            r = np.empty_like(v); r[np.argsort(v)] = np.arange(len(v)); return r
-        rho = float(np.corrcoef(ranks(geo["in_dev"]), ranks(err_rate))[0, 1]) \
-            if err_rate.std() > 0 else float("nan")
-        bad = [r for r in rows if r["run"] == run.name
-               and max(r["err_a"], r["err_b"]) > 0.01]
-        msg = (f"  defect tokens: "
-               + ", ".join(f"{r['token']} (err {max(r['err_a'], r['err_b']):.1%}, "
-                           f"dev {r['in_dev'] / med_dev:.1f}× median @ χ_{r['worst_k']})"
-                           for r in sorted(bad, key=lambda r: -max(r["err_a"], r["err_b"]))[:6])
-               if bad else "  no errors")
-        print(f"[p={p}] {run.name}: {regime}, wrong={err['n_wrong']}, "
-              f"median in_dev {med_dev:.4f}, spearman(dev, err) = {rho:.2f}\n{msg}")
+            r = np.empty_like(v)
+            r[np.argsort(v)] = np.arange(len(v))
+            return r
+
+        rho = (
+            float(np.corrcoef(ranks(geo["in_dev"]), ranks(err_rate))[0, 1])
+            if err_rate.std() > 0
+            else float("nan")
+        )
+        bad = [r for r in rows if r["run"] == run.name and max(r["err_a"], r["err_b"]) > 0.01]
+        msg = (
+            "  defect tokens: "
+            + ", ".join(
+                f"{r['token']} (err {max(r['err_a'], r['err_b']):.1%}, "
+                f"dev {r['in_dev'] / med_dev:.1f}× median @ χ_{r['worst_k']})"
+                for r in sorted(bad, key=lambda r: -max(r["err_a"], r["err_b"]))[:6]
+            )
+            if bad
+            else "  no errors"
+        )
+        print(
+            f"[p={p}] {run.name}: {regime}, wrong={err['n_wrong']}, "
+            f"median in_dev {med_dev:.4f}, spearman(dev, err) = {rho:.2f}\n{msg}"
+        )
     return rows
 
 
@@ -161,16 +178,33 @@ def plot_scatter(rows: list[dict], out_dir: Path) -> None:
 
     ax = axes[0]
     for sel, color, lab, alpha, s in [
-            (grok, "#9ca3af", "tokens of grokked runs", 0.25, 8),
-            ([r for r in noisy if max(r["err_a"], r["err_b"]) <= 0.01],
-             "#2563eb", "noisy runs — clean tokens", 0.35, 10),
-            ([r for r in noisy if max(r["err_a"], r["err_b"]) > 0.01],
-             "#dc2626", "noisy runs — defect tokens", 0.9, 26)]:
+        (grok, "#9ca3af", "tokens of grokked runs", 0.25, 8),
+        (
+            [r for r in noisy if max(r["err_a"], r["err_b"]) <= 0.01],
+            "#2563eb",
+            "noisy runs — clean tokens",
+            0.35,
+            10,
+        ),
+        (
+            [r for r in noisy if max(r["err_a"], r["err_b"]) > 0.01],
+            "#dc2626",
+            "noisy runs — defect tokens",
+            0.9,
+            26,
+        ),
+    ]:
         if not sel:
             continue
-        ax.scatter([r["in_dev"] for r in sel],
-                   [max(r["err_a"], r["err_b"]) for r in sel],
-                   c=color, alpha=alpha, s=s, label=lab, edgecolors="none")
+        ax.scatter(
+            [r["in_dev"] for r in sel],
+            [max(r["err_a"], r["err_b"]) for r in sel],
+            c=color,
+            alpha=alpha,
+            s=s,
+            label=lab,
+            edgecolors="none",
+        )
     ax.set_xlabel("in-subspace deviation from fitted clock geometry")
     ax.set_ylabel("token error rate (max of A, B)")
     ax.set_yscale("symlog", linthresh=1e-3)
@@ -181,15 +215,28 @@ def plot_scatter(rows: list[dict], out_dir: Path) -> None:
     ax = axes[1]
     bins = np.linspace(0, max(r["in_dev"] for r in rows), 60)
     for sel, color, lab in [
-            (grok, "#9ca3af", "grokked runs"),
-            ([r for r in noisy if max(r["err_a"], r["err_b"]) <= 0.01],
-             "#2563eb", "noisy — clean tokens"),
-            ([r for r in noisy if max(r["err_a"], r["err_b"]) > 0.01],
-             "#dc2626", "noisy — defect tokens")]:
+        (grok, "#9ca3af", "grokked runs"),
+        (
+            [r for r in noisy if max(r["err_a"], r["err_b"]) <= 0.01],
+            "#2563eb",
+            "noisy — clean tokens",
+        ),
+        (
+            [r for r in noisy if max(r["err_a"], r["err_b"]) > 0.01],
+            "#dc2626",
+            "noisy — defect tokens",
+        ),
+    ]:
         if sel:
-            ax.hist([r["in_dev"] for r in sel], bins=bins,
-                    density=True, histtype="step", lw=1.8, color=color,
-                    label=lab)
+            ax.hist(
+                [r["in_dev"] for r in sel],
+                bins=bins,
+                density=True,
+                histtype="step",
+                lw=1.8,
+                color=color,
+                label=lab,
+            )
     ax.set_xlabel("in-subspace deviation from fitted clock geometry")
     ax.set_ylabel("density")
     ax.grid(alpha=0.3)
@@ -206,10 +253,13 @@ def plot_scatter(rows: list[dict], out_dir: Path) -> None:
 # Focused probes (per-run): plane zoom and causal geometric repair
 # ---------------------------------------------------------------------------
 
+
 def _setup_run(run_dir: str):
     """Shared scaffold: session, errors, K, geometry fit, defect tokens."""
-    import torch
     from collections import Counter
+
+    import torch
+
     from crypto_interp.interp.grids import compute_logits_grid
 
     S = Session.from_run(run_dir)
@@ -243,11 +293,27 @@ def _setup_run(run_dir: str):
         pd[j] = np.linalg.norm(act - idl, axis=0)
         planes.append((C, Sv, Q))
     z = pd / (np.median(pd, 1, keepdims=True) + 1e-12)
-    kstar = (K[Counter(int(z[:, x - 1].argmax()) for x in defect).most_common(1)[0][0]]
-             if defect else None)
-    return dict(S=S, p=p, n=n, dlog_map=dl, K=K, B=B, theta=theta,
-                planes=planes, z=z, kstar=kstar, defect=defect,
-                base_wrong=base_wrong, grid_wrong=grid_wrong, torch=torch)
+    kstar = (
+        K[Counter(int(z[:, x - 1].argmax()) for x in defect).most_common(1)[0][0]]
+        if defect
+        else None
+    )
+    return dict(
+        S=S,
+        p=p,
+        n=n,
+        dlog_map=dl,
+        K=K,
+        B=B,
+        theta=theta,
+        planes=planes,
+        z=z,
+        kstar=kstar,
+        defect=defect,
+        base_wrong=base_wrong,
+        grid_wrong=grid_wrong,
+        torch=torch,
+    )
 
 
 def zoom(run_dirs: list[str]) -> None:
@@ -263,8 +329,10 @@ def zoom(run_dirs: list[str]) -> None:
         ang = [TAU * c["kstar"] * c["dlog_map"][x] / c["n"] for x in c["defect"]]
         R = abs(np.mean(np.exp(1j * np.array(ang))))
         m = len(c["defect"])
-        print(f"{Path(rd).name} (p={c['p']}): k*={c['kstar']}, {m} defect tokens, "
-              f"wrong={c['base_wrong']}")
+        print(
+            f"{Path(rd).name} (p={c['p']}): k*={c['kstar']}, {m} defect tokens, "
+            f"wrong={c['base_wrong']}"
+        )
         print(f"  plane-z on k*: {['%.1f' % v for v in zdef]}")
         print(f"  angle clustering R={R:.2f} (null≈{0.886 / np.sqrt(m):.2f})")
 
@@ -287,8 +355,7 @@ def repair(run_dirs: list[str], seed: int = 0) -> None:
             WE = S.model.embed.W_E.detach().double().numpy().copy()
             for x in tokens:
                 w = WE[:, x]
-                ideal = (C * np.cos(c["theta"][j, x - 1])
-                         + Sv * np.sin(c["theta"][j, x - 1]))
+                ideal = C * np.cos(c["theta"][j, x - 1]) + Sv * np.sin(c["theta"][j, x - 1])
                 WE[:, x] = w - Q @ (Q.T @ w) + Q @ (Q.T @ ideal)
             return torch.tensor(WE, dtype=S.model.embed.W_E.dtype)
 
@@ -297,26 +364,25 @@ def repair(run_dirs: list[str], seed: int = 0) -> None:
         clean = [x for x in range(1, c["p"]) if x not in c["defect"]]
         variants = {
             "repair defect tokens": c["defect"],
-            "patch random clean": list(rng.choice(clean, size=len(c["defect"]),
-                                                  replace=False)),
+            "patch random clean": list(rng.choice(clean, size=len(c["defect"]), replace=False)),
             "straighten whole clock": list(range(1, c["p"])),
         }
         for lab, toks in variants.items():
             S.model.embed.W_E.data = patched(toks)
             out[lab], _ = c["grid_wrong"]()
             S.model.embed.W_E.data = orig.clone()
-        print(f"{Path(rd).name}: k*=χ_{c['kstar']}, {len(c['defect'])} defect "
-              f"tokens, baseline wrong={c['base_wrong']}")
+        print(
+            f"{Path(rd).name}: k*=χ_{c['kstar']}, {len(c['defect'])} defect "
+            f"tokens, baseline wrong={c['base_wrong']}"
+        )
         for lab, w in out.items():
             print(f"    {lab:>24s}: wrong {c['base_wrong']} -> {w}")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["census", "zoom", "repair"],
-                    default="census")
-    ap.add_argument("--run-dirs", nargs="*", default=None,
-                    help="Run dirs for zoom/repair modes.")
+    ap.add_argument("--mode", choices=["census", "zoom", "repair"], default="census")
+    ap.add_argument("--run-dirs", nargs="*", default=None, help="Run dirs for zoom/repair modes.")
     ap.add_argument("--out-dir", default="outputs/embedding_defect/all")
     args = ap.parse_args()
 

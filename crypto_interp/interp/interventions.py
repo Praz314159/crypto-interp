@@ -73,6 +73,7 @@ def ablate_char_w(model, k: int, basis: torch.Tensor, ci):
             _, test_loss, _ = evaluate_loss(model, ds)
     """
     from .ablate import ablate_character
+
     p = basis.shape[0]
     W_E = model.embed.W_E
     orig = W_E.data.clone()

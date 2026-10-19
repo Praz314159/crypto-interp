@@ -3,6 +3,7 @@
 The reference model (``conftest.REFERENCE_CKPT``) grokked with
 K = {3, 10, 20, 51}: three primaries plus χ_20, a doubling helper of χ_10.
 """
+
 import torch
 
 from crypto_interp.interp import (

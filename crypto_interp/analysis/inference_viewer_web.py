@@ -24,6 +24,7 @@ Usage:
     python -m crypto_interp.analysis.inference_viewer_web \\
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,9 +34,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from crypto_interp.analysis.inference_viewer import char_plane, neuron_phases
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
-from crypto_interp.analysis.inference_viewer import char_plane, neuron_phases
 
 
 def _arr(t) -> list:
@@ -67,8 +68,7 @@ def build_payload(S: Session) -> dict:
         }
         basis_rows[str(k)] = {
             "cos": _arr(S.basis[S.ci.cos[k]][:p]),
-            "sin": _arr(S.basis[S.ci.sin[k]][:p]) if k in S.ci.sin
-                   else [0.0] * p,
+            "sin": _arr(S.basis[S.ci.sin[k]][:p]) if k in S.ci.sin else [0.0] * p,
         }
 
     # Reference logits for the in-browser forward-pass check.
@@ -80,18 +80,33 @@ def build_payload(S: Session) -> dict:
         checks.append({"a": a, "b": b, "logits": _arr(L)})
 
     return {
-        "p": p, "g": g, "eq": int(S.ds.eq_token), "dlog": dlog,
-        "K": K, "helpers": helpers,
-        "cfg": {"d_model": cfg.d_model, "d_mlp": cfg.d_mlp,
-                "num_heads": cfg.num_heads, "d_head": cfg.d_head,
-                "n_ctx": cfg.n_ctx},
-        "W_E": _arr(m.embed.W_E), "W_pos": _arr(m.pos_embed.W_pos),
-        "W_Q": _arr(blk.attn.W_Q), "W_K": _arr(blk.attn.W_K),
-        "W_V": _arr(blk.attn.W_V), "W_O": _arr(blk.attn.W_O),
-        "W_in": _arr(blk.mlp.W_in), "b_in": _arr(blk.mlp.b_in),
-        "W_out": _arr(blk.mlp.W_out), "b_out": _arr(blk.mlp.b_out),
+        "p": p,
+        "g": g,
+        "eq": int(S.ds.eq_token),
+        "dlog": dlog,
+        "K": K,
+        "helpers": helpers,
+        "cfg": {
+            "d_model": cfg.d_model,
+            "d_mlp": cfg.d_mlp,
+            "num_heads": cfg.num_heads,
+            "d_head": cfg.d_head,
+            "n_ctx": cfg.n_ctx,
+        },
+        "W_E": _arr(m.embed.W_E),
+        "W_pos": _arr(m.pos_embed.W_pos),
+        "W_Q": _arr(blk.attn.W_Q),
+        "W_K": _arr(blk.attn.W_K),
+        "W_V": _arr(blk.attn.W_V),
+        "W_O": _arr(blk.attn.W_O),
+        "W_in": _arr(blk.mlp.W_in),
+        "b_in": _arr(blk.mlp.b_in),
+        "W_out": _arr(blk.mlp.W_out),
+        "b_out": _arr(blk.mlp.b_out),
         "W_U": _arr(m.unembed.W_U),
-        "planes": planes, "clusters": clusters, "basis": basis_rows,
+        "planes": planes,
+        "clusters": clusters,
+        "basis": basis_rows,
         "checks": checks,
     }
 
@@ -904,12 +919,13 @@ def export(run_dir: str, out_file: str | None = None) -> Path:
     S = Session.from_run(run_dir)
     payload = build_payload(S)
     run = Path(run_dir)
-    html = (HTML_TEMPLATE
-            .replace("__TITLE__", f"mod-{payload['p']} multiplication — {run.name}")
-            .replace("__P__", str(payload["p"]))
-            .replace("__G__", str(payload["g"]))
-            .replace("__NK__", str(len(payload["K"])))
-            .replace("__PAYLOAD__", json.dumps(payload, separators=(",", ":"))))
+    html = (
+        HTML_TEMPLATE.replace("__TITLE__", f"mod-{payload['p']} multiplication — {run.name}")
+        .replace("__P__", str(payload["p"]))
+        .replace("__G__", str(payload["g"]))
+        .replace("__NK__", str(len(payload["K"])))
+        .replace("__PAYLOAD__", json.dumps(payload, separators=(",", ":")))
+    )
     if out_file is None:
         exp = run.parent.parent.name
         out_file = Path("outputs/inference_viewer") / exp / f"{run.name}.html"

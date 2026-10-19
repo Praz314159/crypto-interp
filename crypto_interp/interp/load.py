@@ -49,8 +49,11 @@ def load_run(
     )
     # Every architecture field the checkpoint records (n_ctx, num_layers, ...);
     # fields it predates fall back to the TransformerConfig defaults.
-    arch = {f.name: cfg_dict[f.name] for f in dataclasses.fields(TransformerConfig)
-            if f.name != "d_vocab" and f.name in cfg_dict}
+    arch = {
+        f.name: cfg_dict[f.name]
+        for f in dataclasses.fields(TransformerConfig)
+        if f.name != "d_vocab" and f.name in cfg_dict
+    }
     cfg = TransformerConfig(d_vocab=ds.vocab_size, **arch)
     model = Transformer(cfg).to(device)
     model.load_state_dict(ckpt["model_state"])

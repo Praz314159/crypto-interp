@@ -18,6 +18,7 @@ Usage:
         --out-file outputs/theory_trajectory/003_dmodel_sweep_p113/all_primes.png \\
         --title "Trajectories across primes"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +27,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 
 CKPT_RE = re.compile(r"seed(\d+)")
 
@@ -54,28 +54,48 @@ def load_trajs(in_dirs: list[Path]) -> list[dict]:
             data["seed"] = int(m.group(1))
             data["name"] = f.stem
             data["color"], data["regime"] = classify_trajectory(
-                float(data["L_emp"][-1]), float(data["L_sym"][-1]))
+                float(data["L_emp"][-1]), float(data["L_sym"][-1])
+            )
             out.append(data)
     return out
 
 
-def grid_panels(trajs: list[dict], title: str, out_file: Path,
-                ymin: float = 1e-9, ymax: float = 20.0) -> None:
+def grid_panels(
+    trajs: list[dict], title: str, out_file: Path, ymin: float = 1e-9, ymax: float = 20.0
+) -> None:
     n = len(trajs)
     cols = min(4, n)
     rows = (n + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(4.0 * cols, 3.0 * rows),
-                             squeeze=False)
+    fig, axes = plt.subplots(rows, cols, figsize=(4.0 * cols, 3.0 * rows), squeeze=False)
     for i, t in enumerate(trajs):
         ax = axes[i // cols][i % cols]
-        ax.semilogy(t["step"], np.clip(t["L_emp"], ymin, None), "o-",
-                    color="C0", markersize=3, label="$L_{\\rm emp}$")
-        ax.semilogy(t["step"], np.clip(t["L_sym"], ymin, None), "s-",
-                    color="C1", markersize=3, label="$L_{\\rm sym}$")
-        ax.semilogy(t["step"], np.clip(t["L_K"], ymin, None), "^-",
-                    color="C2", markersize=2.5, label="$L_{\\theta,K}$")
-        ax.set_title(f"seed {t['seed']} — {t['regime']}",
-                     color=t["color"], fontsize=10, fontweight="bold")
+        ax.semilogy(
+            t["step"],
+            np.clip(t["L_emp"], ymin, None),
+            "o-",
+            color="C0",
+            markersize=3,
+            label="$L_{\\rm emp}$",
+        )
+        ax.semilogy(
+            t["step"],
+            np.clip(t["L_sym"], ymin, None),
+            "s-",
+            color="C1",
+            markersize=3,
+            label="$L_{\\rm sym}$",
+        )
+        ax.semilogy(
+            t["step"],
+            np.clip(t["L_K"], ymin, None),
+            "^-",
+            color="C2",
+            markersize=2.5,
+            label="$L_{\\theta,K}$",
+        )
+        ax.set_title(
+            f"seed {t['seed']} — {t['regime']}", color=t["color"], fontsize=10, fontweight="bold"
+        )
         ax.set_xlabel("step")
         ax.set_ylabel("CE (log)")
         ax.set_ylim(ymin, ymax)
@@ -95,8 +115,12 @@ def grid_panels(trajs: list[dict], title: str, out_file: Path,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in-dir", nargs="+", required=True,
-                    help="Directory or directories of theory_trajectory .npz files.")
+    ap.add_argument(
+        "--in-dir",
+        nargs="+",
+        required=True,
+        help="Directory or directories of theory_trajectory .npz files.",
+    )
     ap.add_argument("--out-file", required=True)
     ap.add_argument("--title", default="Trajectories")
     args = ap.parse_args()

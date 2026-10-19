@@ -63,6 +63,7 @@ Every playbook starts from this:
 
 ```python
 from crypto_interp.interp import Session
+
 S = Session.from_run("experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1")
 # S.model, S.ds, S.basis, S.ci ready; S.cache and S.logits_grid lazy.
 ```

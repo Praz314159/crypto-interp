@@ -9,27 +9,31 @@ PosEmbed than the d_model=128 baseline.
 
 from crypto_interp.training import ExperimentConfig
 
-
 CONFIG = ExperimentConfig(
     task="mul",
     p=113,
     frac_train=0.3,
     seed=0,
-
     # *** The variable being changed in this experiment ***
     d_model=12,
-
     # Everything else mirrors 001 baseline
-    d_mlp=512, num_heads=4, d_head=32, n_ctx=3, num_layers=1,
-    lr=1e-3, weight_decay=1.0, beta1=0.9, beta2=0.98, warmup_steps=10,
-
+    d_mlp=512,
+    num_heads=4,
+    d_head=32,
+    n_ctx=3,
+    num_layers=1,
+    lr=1e-3,
+    weight_decay=1.0,
+    beta1=0.9,
+    beta2=0.98,
+    warmup_steps=10,
     # Longer training: shrunk models often grok later (see Nanda et al.
     # appendix; we'll also re-check this empirically here).
     num_epochs=20_000,
-
-    save_every=500, log_every=100, metrics_every=50,
+    save_every=500,
+    log_every=100,
+    metrics_every=50,
     device="auto",
-
     notes=(
         "Minimum-d_model probe. Prediction: groks within 20k epochs. "
         "Algorithmic floor is 2|K|=8 (4 frequencies × cos+sin); add 2 dims "

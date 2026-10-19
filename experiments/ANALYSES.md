@@ -185,8 +185,14 @@ python experiments/003_dmodel_sweep_p113/scripts/viz_basin_commitment.py \
 **Helper classification in-process** (primary vs Sylow-2 doubling):
 
 ```python
-from crypto_interp.interp import (char_index, load_run, latest_checkpoint,
-                                  essential_characters, find_primary_helper_pairs)
+from crypto_interp.interp import (
+    char_index,
+    load_run,
+    latest_checkpoint,
+    essential_characters,
+    find_primary_helper_pairs,
+)
+
 basis, ci = char_index(113)
 model, ds, _ = load_run(latest_checkpoint(RUN))
 K = essential_characters(model, ds, ci, basis)["K"]

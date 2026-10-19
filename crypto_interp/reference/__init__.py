@@ -6,11 +6,11 @@ the standard textbook algorithm(s) for one task.
 """
 
 from .sqrt import (
-    legendre_symbol,
-    is_quadratic_residue,
     canonical_root,
-    tonelli_shanks,
     cipolla,
+    is_quadratic_residue,
+    legendre_symbol,
+    tonelli_shanks,
 )
 
 __all__ = [

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,17 +7,23 @@ name = "crypto_interp"
 version = "0.1.0"
 description = "Mechanistic interpretability of cryptographically-important algorithms learned by small transformers."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Prashanth Ramakrishna" }]
 requires-python = ">=3.10"
 dependencies = [
-    "torch",
-    "numpy",
-    "einops",
-    "matplotlib",
-    "jaxtyping",
+    "torch>=2.2",
+    "numpy>=1.26",
+    "einops>=0.7",
+    "matplotlib>=3.8",
+    "jaxtyping>=0.2.25",
+    "pandas>=2.1",
+    "pyarrow>=14",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+# ruff is pinned exactly so local and CI format identically.
+dev = ["pytest>=8", "ruff==0.17.1"]
 
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
@@ -25,3 +31,18 @@ exclude = ["experiments*", "scripts*", "notes*", "papers*", "infra*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# Legacy per-experiment scripts are archived in a later PR rather than linted.
+extend-exclude = ["experiments/*/scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+# F722: jaxtyping shape strings ("batch pos d") are not forward references.
+ignore = ["F722"]
+
+[tool.ruff.lint.per-file-ignores]
+# analysis/ is rewritten into measures in a later PR; lint only for real errors there.
+"crypto_interp/analysis/*" = ["E501", "E701", "E702", "E731", "E741", "B007", "B023", "B905"]

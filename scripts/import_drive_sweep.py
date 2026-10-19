@@ -16,6 +16,7 @@ Usage:
     # Dry run (show what would happen):
     python -m scripts.import_drive_sweep --drive ~/Downloads/crypto_sweep --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -84,12 +85,15 @@ def import_one(src: Path, p: int, seed: int, repo_root: Path, *, dry_run: bool) 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--drive", required=True,
-                    help="Path to crypto_sweep directory (or zip of it) from Drive.")
-    ap.add_argument("--repo-root", default=".",
-                    help="Repo root containing experiments/ (default: cwd).")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="Show what would happen without copying.")
+    ap.add_argument(
+        "--drive", required=True, help="Path to crypto_sweep directory (or zip of it) from Drive."
+    )
+    ap.add_argument(
+        "--repo-root", default=".", help="Repo root containing experiments/ (default: cwd)."
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Show what would happen without copying."
+    )
     args = ap.parse_args()
 
     drive_path = Path(args.drive).expanduser().resolve()

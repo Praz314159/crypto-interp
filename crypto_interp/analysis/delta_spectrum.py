@@ -10,6 +10,7 @@ Usage:
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1 \
         --ks 3,10,20,51,6
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,26 +50,27 @@ def main():
     for i, k in enumerate(ks):
         _, energy, dominant = delta_k_spectrum(model, ds, ci, basis, k, logits_full=logits_full)
         top = sorted(range(len(energy)), key=lambda j: -energy[j])[:5]
-        top_strs = [f"m={top[j]+1} E={energy[top[j]]:.2e}" for j in range(5)]
-        print(f"ablating k={k:>3} (order {order_of(k, p)}):  dominant m={dominant}; "
-              + "; ".join(top_strs))
+        top_strs = [f"m={top[j] + 1} E={energy[top[j]]:.2e}" for j in range(5)]
+        print(
+            f"ablating k={k:>3} (order {order_of(k, p)}):  dominant m={dominant}; "
+            + "; ".join(top_strs)
+        )
 
         ax = axes[i]
         ax.bar(np.arange(1, N // 2 + 1), energy, color="#1f77b4", alpha=0.85)
         if k <= N // 2:
             ax.axvline(k, color="red", ls="--", lw=1.0, alpha=0.7, label=f"naive k={k}")
         if 2 * k <= N // 2:
-            ax.axvline(2 * k, color="orange", ls="--", lw=1.0, alpha=0.7, label=f"2k={2*k}")
+            ax.axvline(2 * k, color="orange", ls="--", lw=1.0, alpha=0.7, label=f"2k={2 * k}")
         if N - k <= N // 2:
-            ax.axvline(N - k, color="green", ls="--", lw=1.0, alpha=0.7, label=f"-k={N-k}")
+            ax.axvline(N - k, color="green", ls="--", lw=1.0, alpha=0.7, label=f"-k={N - k}")
         ax.set_ylabel(f"ablate k={k}")
         ax.set_yscale("log")
         ax.legend(fontsize=7, loc="upper right")
         ax.grid(True, alpha=0.3, axis="y")
 
     axes[-1].set_xlabel("Fourier frequency m of Δ_k(Δlog)")
-    fig.suptitle("Spectrum of Δ_k(Δlog): what frequency does ablating each k destroy?",
-                 fontsize=11)
+    fig.suptitle("Spectrum of Δ_k(Δlog): what frequency does ablating each k destroy?", fontsize=11)
     fig.tight_layout()
     out = run_dir / "delta_spectrum.png"
     fig.savefig(out, dpi=130, bbox_inches="tight")

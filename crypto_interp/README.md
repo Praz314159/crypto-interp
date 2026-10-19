@@ -43,10 +43,11 @@ documented in `playbooks/README.md`. Browse:
 from crypto_interp.interp import Session, correlate
 
 S = Session.from_run("experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1")
-K = S.essential()["K"]                                  # essential characters
-helpers = [(h, m, mult) for (h, m, mult, _e) in S.helpers(K)]   # ×2 doubling
-sizes = S.cluster_sizes(K)                              # 0 for helpers
-sig = S.cluster_signal(K[1]); ref = S.reference_signal(K[1])
+K = S.essential()["K"]  # essential characters
+helpers = [(h, m, mult) for (h, m, mult, _e) in S.helpers(K)]  # ×2 doubling
+sizes = S.cluster_sizes(K)  # 0 for helpers
+sig = S.cluster_signal(K[1])
+ref = S.reference_signal(K[1])
 print(K, helpers, sizes, correlate(sig, ref))
 # [8,10,33,46,52]  [(8,52,2),(46,33,2)]  {8:0,10:8,33:6,46:0,52:6}  0.978
 ```

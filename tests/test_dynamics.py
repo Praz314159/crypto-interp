@@ -23,12 +23,12 @@ def test_bifurcation_and_commit():
     T, nch = 10, 4
     E = np.ones((T, nch)) * 0.1
     for t in range(T):
-        E[t, 0] = 0.2 + 0.2 * t   # K characters start above and grow vs non-K
+        E[t, 0] = 0.2 + 0.2 * t  # K characters start above and grow vs non-K
         E[t, 1] = 0.2 + 0.2 * t
     K_mask = np.array([True, True, False, False])
 
     bs = bifurcation_step(E, K_mask, ratio=1.5)
     assert bs is not None and bs > 0
 
-    cs = commit_step(E, [1, 2], mode="subset")   # 1-based char ids of the two growers
+    cs = commit_step(E, [1, 2], mode="subset")  # 1-based char ids of the two growers
     assert cs == 0

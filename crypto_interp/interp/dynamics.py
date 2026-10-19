@@ -1,6 +1,7 @@
 """Grokking-dynamics detectors: cliff, bifurcation, commitment, and a
 grokked/failed status summary. Prime-parametric (operate on trajectories).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -45,8 +46,9 @@ def commit_step(char_E_traj, final_K, mode: str = "subset") -> int | None:
     return None
 
 
-def grokking_status(train_losses, test_losses, *,
-                    mem_thresh: float = 0.1, grok_thresh: float = 0.1) -> dict:
+def grokking_status(
+    train_losses, test_losses, *, mem_thresh: float = 0.1, grok_thresh: float = 0.1
+) -> dict:
     """Summarize a run: when it memorized (train loss < ``mem_thresh``), when it
     grokked (test loss < ``grok_thresh``), whether it grokked at all, and the
     final test loss. ``cliff_step is None`` => the run did not grok."""

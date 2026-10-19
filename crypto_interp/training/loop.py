@@ -25,16 +25,21 @@ from ..interp.metrics import EmbeddingEnergyTracker
 from ..models import Transformer, TransformerConfig
 from .config import ExperimentConfig
 
-
 # ----------------------------- helpers -----------------------------
+
 
 def _write_manifest(run_dir: Path, cfg: ExperimentConfig, device) -> None:
     """Record run provenance so it never has to be reconstructed from mtimes."""
     try:
-        git_sha = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-        ).stdout.strip() or None
+        git_sha = (
+            subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.strip()
+            or None
+        )
     except Exception:
         git_sha = None
     manifest = {
@@ -90,8 +95,12 @@ def _stamp_checkpoint(cfg: ExperimentConfig, datasets_dir: Path) -> dict:
 # carry over from the loaded checkpoint so the stamp keeps describing the model
 # that is actually being trained.
 _RESUME_OVERRIDE_KEYS = (
-    "log_every", "save_every", "metrics_every",
-    "early_stop_loss", "early_stop_patience", "device",
+    "log_every",
+    "save_every",
+    "metrics_every",
+    "early_stop_loss",
+    "early_stop_patience",
+    "device",
 )
 
 
@@ -139,6 +148,7 @@ def _save_checkpoint(
 
 # ----------------------------- public API -----------------------------
 
+
 def train(
     cfg: ExperimentConfig,
     run_dir: Path,
@@ -160,50 +170,56 @@ def train(
     use_float64 = device.type != "mps"
     print(f"Device: {device}, high-precision (float64) loss: {use_float64}")
     if not use_float64:
-        print("WARNING: MPS doesn't support float64. Float32 cross-entropy may "
-              "cause grokking-relevant loss spikes (see Nanda et al. appendix).")
+        print(
+            "WARNING: MPS doesn't support float64. Float32 cross-entropy may "
+            "cause grokking-relevant loss spikes (see Nanda et al. appendix)."
+        )
 
     ds = data.load_or_build(
         cache_dir=datasets_dir,
-        task=cfg.task, p=cfg.p, frac_train=cfg.frac_train, seed=cfg.seed,
+        task=cfg.task,
+        p=cfg.p,
+        frac_train=cfg.frac_train,
+        seed=cfg.seed,
     )
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
     test_mask = ds.test_mask.to(device)
-    print(f"task={ds.task}, p={ds.p}, total={len(ds.inputs)}, "
-          f"train={ds.n_train}, test={ds.n_test}, vocab={ds.vocab_size}")
+    print(
+        f"task={ds.task}, p={ds.p}, total={len(ds.inputs)}, "
+        f"train={ds.n_train}, test={ds.n_test}, vocab={ds.vocab_size}"
+    )
 
     model_cfg = TransformerConfig(
         d_vocab=ds.vocab_size,
-        d_model=cfg.d_model, d_mlp=cfg.d_mlp,
-        num_heads=cfg.num_heads, d_head=cfg.d_head,
-        n_ctx=cfg.n_ctx, num_layers=cfg.num_layers,
+        d_model=cfg.d_model,
+        d_mlp=cfg.d_mlp,
+        num_heads=cfg.num_heads,
+        d_head=cfg.d_head,
+        n_ctx=cfg.n_ctx,
+        num_layers=cfg.num_layers,
     )
     model = Transformer(model_cfg).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {n_params:,}")
 
     optimizer = optim.AdamW(
-        model.parameters(), lr=cfg.lr,
+        model.parameters(),
+        lr=cfg.lr,
         weight_decay=cfg.weight_decay,
         betas=(cfg.beta1, cfg.beta2),
     )
     warmup = max(cfg.warmup_steps, 1)
-    scheduler = optim.lr_scheduler.LambdaLR(
-        optimizer, lambda s: min(s / warmup, 1.0)
-    )
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda s: min(s / warmup, 1.0))
 
     cfg_stamp = _stamp_checkpoint(cfg, datasets_dir)
     train_losses: list[float] = []
     test_losses: list[float] = []
-    fg_W_E: list[torch.Tensor] = []   # per-step W_E for the first fine_grained_until epochs
+    fg_W_E: list[torch.Tensor] = []  # per-step W_E for the first fine_grained_until epochs
     fg_epochs: list[int] = []
 
-    tracker = (
-        EmbeddingEnergyTracker(p=ds.p, device=device)
-        if cfg.metrics_every > 0 else None
-    )
+    tracker = EmbeddingEnergyTracker(p=ds.p, device=device) if cfg.metrics_every > 0 else None
     if tracker is not None:
         print(f"Tracking metrics every {cfg.metrics_every} epochs.")
 
@@ -217,11 +233,13 @@ def train(
         if cfg.fine_grained_until and epoch < cfg.fine_grained_until:
             fg_W_E.append(model.embed.W_E.detach().cpu().clone())
             fg_epochs.append(epoch)
-        train_loss = _loss_fn(model, inputs[train_mask], labels[train_mask],
-                              ds.n_answer_tokens, use_float64)
+        train_loss = _loss_fn(
+            model, inputs[train_mask], labels[train_mask], ds.n_answer_tokens, use_float64
+        )
         with torch.no_grad():
-            test_loss = _loss_fn(model, inputs[test_mask], labels[test_mask],
-                                 ds.n_answer_tokens, use_float64)
+            test_loss = _loss_fn(
+                model, inputs[test_mask], labels[test_mask], ds.n_answer_tokens, use_float64
+            )
         train_losses.append(train_loss.item())
         test_losses.append(test_loss.item())
 
@@ -235,40 +253,58 @@ def train(
 
         if epoch % cfg.log_every == 0:
             elapsed = time.time() - start
-            print(f"epoch {epoch:6d} | log10 train {np.log10(train_loss.item()):7.3f} | "
-                  f"log10 test {np.log10(test_loss.item()):7.3f} | {elapsed:.1f}s")
+            print(
+                f"epoch {epoch:6d} | log10 train {np.log10(train_loss.item()):7.3f} | "
+                f"log10 test {np.log10(test_loss.item()):7.3f} | {elapsed:.1f}s"
+            )
 
         if cfg.early_stop_loss > 0:
             if test_loss.item() < cfg.early_stop_loss:
                 early_stop_streak += 1
                 if early_stop_streak >= cfg.early_stop_patience:
-                    print(f"Early stop at epoch {epoch}: test_loss < "
-                          f"{cfg.early_stop_loss} for {cfg.early_stop_patience} epochs.")
-                    _save_checkpoint(run_dir, epoch, model, optimizer, scheduler,
-                                     train_losses, test_losses, cfg_stamp)
+                    print(
+                        f"Early stop at epoch {epoch}: test_loss < "
+                        f"{cfg.early_stop_loss} for {cfg.early_stop_patience} epochs."
+                    )
+                    _save_checkpoint(
+                        run_dir,
+                        epoch,
+                        model,
+                        optimizer,
+                        scheduler,
+                        train_losses,
+                        test_losses,
+                        cfg_stamp,
+                    )
                     break
             else:
                 early_stop_streak = 0
 
         if (epoch % cfg.save_every == 0) or (epoch == cfg.num_epochs - 1):
-            _save_checkpoint(run_dir, epoch, model, optimizer, scheduler,
-                             train_losses, test_losses, cfg_stamp)
+            _save_checkpoint(
+                run_dir, epoch, model, optimizer, scheduler, train_losses, test_losses, cfg_stamp
+            )
 
-    torch.save({"train_losses": train_losses, "test_losses": test_losses},
-               run_dir / "losses.pt")
+    torch.save({"train_losses": train_losses, "test_losses": test_losses}, run_dir / "losses.pt")
     if fg_W_E:
-        torch.save({"W_E": torch.stack(fg_W_E), "epochs": torch.tensor(fg_epochs)},
-                   run_dir / "fine_grained.pt")
+        torch.save(
+            {"W_E": torch.stack(fg_W_E), "epochs": torch.tensor(fg_epochs)},
+            run_dir / "fine_grained.pt",
+        )
         print(f"Saved fine-grained W_E ({len(fg_W_E)} steps): {run_dir / 'fine_grained.pt'}")
     if tracker is not None:
         tracker.save(
             run_dir / "metrics.pt",
-            config={"task": ds.task, "p": ds.p, "seed": cfg.seed,
-                    "frac_train": cfg.frac_train, "metrics_every": cfg.metrics_every},
+            config={
+                "task": ds.task,
+                "p": ds.p,
+                "seed": cfg.seed,
+                "frac_train": cfg.frac_train,
+                "metrics_every": cfg.metrics_every,
+            },
         )
         print(f"Saved metrics: {run_dir / 'metrics.pt'}")
-    print(f"Done. Final train loss {train_losses[-1]:.6f}, "
-          f"test loss {test_losses[-1]:.6f}")
+    print(f"Done. Final train loss {train_losses[-1]:.6f}, test loss {test_losses[-1]:.6f}")
     return {
         "epoch": last_epoch_done,
         "train_loss": train_losses[-1],
@@ -303,8 +339,10 @@ def resume(
 
     ds = data.load_or_build(
         cache_dir=datasets_dir,
-        task=saved_cfg["task"], p=saved_cfg["p"],
-        frac_train=saved_cfg["frac_train"], seed=saved_cfg["seed"],
+        task=saved_cfg["task"],
+        p=saved_cfg["p"],
+        frac_train=saved_cfg["frac_train"],
+        seed=saved_cfg["seed"],
     )
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
@@ -313,8 +351,10 @@ def resume(
 
     model_cfg = TransformerConfig(
         d_vocab=ds.vocab_size,
-        d_model=saved_cfg["d_model"], d_mlp=saved_cfg["d_mlp"],
-        num_heads=saved_cfg["num_heads"], d_head=saved_cfg["d_head"],
+        d_model=saved_cfg["d_model"],
+        d_mlp=saved_cfg["d_mlp"],
+        num_heads=saved_cfg["num_heads"],
+        d_head=saved_cfg["d_head"],
         n_ctx=saved_cfg.get("n_ctx", 3),
         num_layers=saved_cfg.get("num_layers", 1),
     )
@@ -322,16 +362,15 @@ def resume(
     model.load_state_dict(rckpt["model_state"])
 
     optimizer = optim.AdamW(
-        model.parameters(), lr=saved_cfg["lr"],
+        model.parameters(),
+        lr=saved_cfg["lr"],
         weight_decay=saved_cfg["weight_decay"],
         betas=(saved_cfg.get("beta1", 0.9), saved_cfg.get("beta2", 0.98)),
     )
     optimizer.load_state_dict(rckpt["optimizer_state"])
 
     warmup = max(saved_cfg.get("warmup_steps", 10), 1)
-    scheduler = optim.lr_scheduler.LambdaLR(
-        optimizer, lambda s: min(s / warmup, 1.0)
-    )
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda s: min(s / warmup, 1.0))
     if "scheduler_state" in rckpt:
         scheduler.load_state_dict(rckpt["scheduler_state"])
     else:
@@ -342,10 +381,7 @@ def resume(
     train_losses = list(rckpt["train_losses"])
     test_losses = list(rckpt["test_losses"])
 
-    tracker = (
-        EmbeddingEnergyTracker(p=ds.p, device=device)
-        if cfg.metrics_every > 0 else None
-    )
+    tracker = EmbeddingEnergyTracker(p=ds.p, device=device) if cfg.metrics_every > 0 else None
     if tracker is not None and (run_dir / "metrics.pt").exists():
         tracker.restore(torch.load(run_dir / "metrics.pt", weights_only=False))
 
@@ -359,11 +395,13 @@ def resume(
 
     for epoch in range(start_epoch, end_epoch):
         last_epoch_done = epoch
-        train_loss = _loss_fn(model, inputs[train_mask], labels[train_mask],
-                              ds.n_answer_tokens, use_float64)
+        train_loss = _loss_fn(
+            model, inputs[train_mask], labels[train_mask], ds.n_answer_tokens, use_float64
+        )
         with torch.no_grad():
-            test_loss = _loss_fn(model, inputs[test_mask], labels[test_mask],
-                                 ds.n_answer_tokens, use_float64)
+            test_loss = _loss_fn(
+                model, inputs[test_mask], labels[test_mask], ds.n_answer_tokens, use_float64
+            )
         train_losses.append(train_loss.item())
         test_losses.append(test_loss.item())
 
@@ -377,31 +415,46 @@ def resume(
 
         if epoch % cfg.log_every == 0:
             elapsed = time.time() - start
-            print(f"epoch {epoch:6d} | log10 train {np.log10(train_loss.item()):7.3f} | "
-                  f"log10 test {np.log10(test_loss.item()):7.3f} | {elapsed:.1f}s")
+            print(
+                f"epoch {epoch:6d} | log10 train {np.log10(train_loss.item()):7.3f} | "
+                f"log10 test {np.log10(test_loss.item()):7.3f} | {elapsed:.1f}s"
+            )
 
         if cfg.early_stop_loss > 0:
             if test_loss.item() < cfg.early_stop_loss:
                 early_stop_streak += 1
                 if early_stop_streak >= cfg.early_stop_patience:
                     print(f"Early stop at epoch {epoch}.")
-                    _save_checkpoint(run_dir, epoch, model, optimizer, scheduler,
-                                     train_losses, test_losses, cfg_stamp)
+                    _save_checkpoint(
+                        run_dir,
+                        epoch,
+                        model,
+                        optimizer,
+                        scheduler,
+                        train_losses,
+                        test_losses,
+                        cfg_stamp,
+                    )
                     break
             else:
                 early_stop_streak = 0
 
         if (epoch % cfg.save_every == 0) or (epoch == end_epoch - 1):
-            _save_checkpoint(run_dir, epoch, model, optimizer, scheduler,
-                             train_losses, test_losses, cfg_stamp)
+            _save_checkpoint(
+                run_dir, epoch, model, optimizer, scheduler, train_losses, test_losses, cfg_stamp
+            )
 
-    torch.save({"train_losses": train_losses, "test_losses": test_losses},
-               run_dir / "losses.pt")
+    torch.save({"train_losses": train_losses, "test_losses": test_losses}, run_dir / "losses.pt")
     if tracker is not None:
         tracker.save(
             run_dir / "metrics.pt",
-            config={"task": ds.task, "p": ds.p, "seed": saved_cfg["seed"],
-                    "frac_train": saved_cfg["frac_train"], "metrics_every": cfg.metrics_every},
+            config={
+                "task": ds.task,
+                "p": ds.p,
+                "seed": saved_cfg["seed"],
+                "frac_train": saved_cfg["frac_train"],
+                "metrics_every": cfg.metrics_every,
+            },
         )
     print(f"Done. Final train {train_losses[-1]:.6f}, test {test_losses[-1]:.6f}")
     return {

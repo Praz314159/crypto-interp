@@ -21,6 +21,7 @@ explicit. Treat instances as immutable from outside.
 """
 
 from __future__ import annotations
+
 from typing import Iterable, Iterator, Union
 
 import einops
@@ -43,7 +44,7 @@ def _short_name(full: str) -> str:
     for seg in full.split("."):
         if seg == "blocks" or seg.isdigit():
             continue
-        out.append(seg[len("hook_"):] if seg.startswith("hook_") else seg)
+        out.append(seg[len("hook_") :] if seg.startswith("hook_") else seg)
     return "_".join(out)
 
 
@@ -82,20 +83,37 @@ def resolve_name(names: Iterable[str], key: HookKey) -> str:
 class ActivationCache:
     def __init__(self, cache_dict: dict, p: int | None = None):
         # detach tensors to drop graphs; pass non-tensors through (e.g., logits, all_inputs)
-        self._cache = {k: (v.detach() if isinstance(v, torch.Tensor) else v)
-                       for k, v in cache_dict.items()}
+        self._cache = {
+            k: (v.detach() if isinstance(v, torch.Tensor) else v) for k, v in cache_dict.items()
+        }
         self._p = p
 
     # ---------- dict-like interface ----------
-    def __getitem__(self, key: HookKey): return self._cache[self._resolve(key)]
+    def __getitem__(self, key: HookKey):
+        return self._cache[self._resolve(key)]
+
     def __contains__(self, key: HookKey) -> bool:
-        try: self._resolve(key); return True
-        except KeyError: return False
-    def __iter__(self) -> Iterator[str]: return iter(self._cache)
-    def __len__(self) -> int: return len(self._cache)
-    def keys(self): return self._cache.keys()
-    def values(self): return self._cache.values()
-    def items(self): return self._cache.items()
+        try:
+            self._resolve(key)
+            return True
+        except KeyError:
+            return False
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._cache)
+
+    def __len__(self) -> int:
+        return len(self._cache)
+
+    def keys(self):
+        return self._cache.keys()
+
+    def values(self):
+        return self._cache.values()
+
+    def items(self):
+        return self._cache.items()
+
     def __repr__(self) -> str:
         return f"ActivationCache({len(self._cache)} keys, p={self._p})"
 
@@ -122,7 +140,9 @@ class ActivationCache:
         """
         p = p or self._p
         if p is None:
-            raise ValueError("grid() requires p (pass at construction via run_with_cache+ds, or here)")
+            raise ValueError(
+                "grid() requires p (pass at construction via run_with_cache+ds, or here)"
+            )
         return einops.rearrange(self[key], "(a b) ... -> a b ...", a=p, b=p)
 
     def decompose_resid(self) -> dict[str, torch.Tensor]:
@@ -135,10 +155,14 @@ class ActivationCache:
         """
         layers = {_layer_of(k) for k in self._cache} - {None}
         if len(layers) > 1:
-            raise ValueError(f"decompose_resid is defined for 1-block models; cache has blocks {sorted(layers)}")
-        return {"resid_pre": self["resid_pre"],
-                "attn_out": self["attn_out"],
-                "mlp_out":  self["mlp_out"]}
+            raise ValueError(
+                f"decompose_resid is defined for 1-block models; cache has blocks {sorted(layers)}"
+            )
+        return {
+            "resid_pre": self["resid_pre"],
+            "attn_out": self["attn_out"],
+            "mlp_out": self["mlp_out"],
+        }
 
     # ---------- internal mutation (used by run_with_cache to attach logits) ----------
     def _put(self, key: str, value) -> None:

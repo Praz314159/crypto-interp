@@ -3,7 +3,8 @@
 Usage:
     python scripts/train.py --experiment 001_mul_p113 --tag main_run
     python scripts/train.py --experiment 001_mul_p113 --seed-override 7 --tag seed7
-    python scripts/train.py --experiment 001_mul_p113 --resume experiments/001_mul_p113/runs/main_run/checkpoint_006500.pt --num-epochs 2000
+    python scripts/train.py --experiment 001_mul_p113 \
+        --resume experiments/001_mul_p113/runs/main_run/checkpoint_006500.pt --num-epochs 2000
 
 Loads ``experiments/<id>/config.py:CONFIG`` and hands it to the library's
 training loop. CLI flags can override the high-traffic knobs (seed, epochs,
@@ -29,9 +30,7 @@ def load_experiment_config(experiment_id: str):
     cfg_path = REPO_ROOT / "experiments" / experiment_id / "config.py"
     if not cfg_path.exists():
         raise FileNotFoundError(f"No config at {cfg_path}")
-    spec = importlib.util.spec_from_file_location(
-        f"experiments.{experiment_id}.config", cfg_path
-    )
+    spec = importlib.util.spec_from_file_location(f"experiments.{experiment_id}.config", cfg_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if not hasattr(module, "CONFIG"):
@@ -41,44 +40,70 @@ def load_experiment_config(experiment_id: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", required=True,
-                        help="Experiment id (directory under experiments/, e.g. 001_mul_p113).")
-    parser.add_argument("--tag", default=None,
-                        help="Sub-directory name under <experiment>/runs/. "
-                             "Defaults to a timestamp.")
+    parser.add_argument(
+        "--experiment",
+        required=True,
+        help="Experiment id (directory under experiments/, e.g. 001_mul_p113).",
+    )
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="Sub-directory name under <experiment>/runs/. Defaults to a timestamp.",
+    )
     # Overrides (omit → use CONFIG's value)
-    parser.add_argument("--seed-override", type=int, default=None,
-                        help="Override CONFIG.seed for this run.")
+    parser.add_argument(
+        "--seed-override", type=int, default=None, help="Override CONFIG.seed for this run."
+    )
     parser.add_argument("--num-epochs", type=int, default=None)
     parser.add_argument("--log-every", type=int, default=None)
     parser.add_argument("--save-every", type=int, default=None)
     parser.add_argument("--metrics-every", type=int, default=None)
-    parser.add_argument("--device", type=str, default=None,
-                        help="Override CONFIG.device. 'auto'|'cpu'|'mps'|'cuda'.")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Override CONFIG.device. 'auto'|'cpu'|'mps'|'cuda'.",
+    )
     parser.add_argument("--early-stop-loss", type=float, default=None)
     parser.add_argument("--early-stop-patience", type=int, default=None)
     # Generic override (repeatable): --override key=value sets any ExperimentConfig field
-    parser.add_argument("--override", action="append", default=[], metavar="KEY=VALUE",
-                        help="Override any CONFIG field, repeatable. Type is "
-                             "coerced from the field's declared type. Example: "
-                             "--override d_model=16 --override d_mlp=128")
+    parser.add_argument(
+        "--override",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override any CONFIG field, repeatable. Type is "
+        "coerced from the field's declared type. Example: "
+        "--override d_model=16 --override d_mlp=128",
+    )
     # Resume
-    parser.add_argument("--resume", type=str, default=None,
-                        help="Resume from this checkpoint path. --num-epochs is "
-                             "interpreted as additional epochs.")
+    parser.add_argument(
+        "--resume",
+        type=str,
+        default=None,
+        help="Resume from this checkpoint path. --num-epochs is interpreted as additional epochs.",
+    )
     args = parser.parse_args()
 
     cfg = load_experiment_config(args.experiment)
 
     overrides = {}
-    if args.seed_override is not None: overrides["seed"] = args.seed_override
-    if args.num_epochs is not None: overrides["num_epochs"] = args.num_epochs
-    if args.log_every is not None: overrides["log_every"] = args.log_every
-    if args.save_every is not None: overrides["save_every"] = args.save_every
-    if args.metrics_every is not None: overrides["metrics_every"] = args.metrics_every
-    if args.device is not None: overrides["device"] = args.device
-    if args.early_stop_loss is not None: overrides["early_stop_loss"] = args.early_stop_loss
-    if args.early_stop_patience is not None: overrides["early_stop_patience"] = args.early_stop_patience
+    if args.seed_override is not None:
+        overrides["seed"] = args.seed_override
+    if args.num_epochs is not None:
+        overrides["num_epochs"] = args.num_epochs
+    if args.log_every is not None:
+        overrides["log_every"] = args.log_every
+    if args.save_every is not None:
+        overrides["save_every"] = args.save_every
+    if args.metrics_every is not None:
+        overrides["metrics_every"] = args.metrics_every
+    if args.device is not None:
+        overrides["device"] = args.device
+    if args.early_stop_loss is not None:
+        overrides["early_stop_loss"] = args.early_stop_loss
+    if args.early_stop_patience is not None:
+        overrides["early_stop_patience"] = args.early_stop_patience
 
     # Generic --override key=value (type-coerced from the dataclass field type).
     if args.override:
@@ -89,9 +114,7 @@ def main():
             key, value = kv.split("=", 1)
             key = key.strip()
             if key not in field_types:
-                raise SystemExit(
-                    f"Unknown CONFIG field {key!r}. Known: {sorted(field_types)}"
-                )
+                raise SystemExit(f"Unknown CONFIG field {key!r}. Known: {sorted(field_types)}")
             t = field_types[key]
             # Coerce. Dataclass field types come as strings under
             # `from __future__ import annotations`; handle the common scalar cases.
@@ -113,17 +136,18 @@ def main():
     datasets_dir = exp_dir / "datasets"
 
     # Import inside main so --help doesn't pull in torch.
-    from crypto_interp.training import train, resume
+    from crypto_interp.training import resume, train
 
     if args.resume:
         resume_path = Path(args.resume)
         if not resume_path.is_absolute():
             resume_path = (REPO_ROOT / resume_path).resolve()
-        result = resume(cfg, resume_path,
-                        additional_epochs=cfg.num_epochs,
-                        datasets_dir=datasets_dir)
+        result = resume(
+            cfg, resume_path, additional_epochs=cfg.num_epochs, datasets_dir=datasets_dir
+        )
     else:
         import time
+
         tag = args.tag or f"{cfg.task}_{int(time.time())}"
         run_dir = exp_dir / "runs" / tag
         result = train(cfg, run_dir=run_dir, datasets_dir=datasets_dir)

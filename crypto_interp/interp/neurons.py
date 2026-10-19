@@ -68,17 +68,19 @@ def compute_per_neuron_frequency_energy(
 
 # ---------- output-side cluster identification ----------
 
-def per_neuron_dominant_char(W_U: torch.Tensor, W_out: torch.Tensor,
-                             basis: torch.Tensor, ci, p: int):
+
+def per_neuron_dominant_char(
+    W_U: torch.Tensor, W_out: torch.Tensor, basis: torch.Tensor, ci, p: int
+):
     """Return ``(char_E[d_mlp, n_chars], dominant_char[d_mlp])`` (1-based char ids).
 
     Projects ``W_U @ W_out`` onto the character basis to identify each neuron's
     dominant output character. Used to find the cluster of neurons specialized
     to each character k (mechanism verification, free-rider economy analysis).
     """
-    V = W_U[:, :p].double().T @ W_out.double()        # (p, d_mlp)
-    coef = basis @ V                                   # (n_basis, d_mlp)
-    E = coef ** 2
+    V = W_U[:, :p].double().T @ W_out.double()  # (p, d_mlp)
+    coef = basis @ V  # (n_basis, d_mlp)
+    E = coef**2
     nch = max(ci.freqs)
     char_E = np.zeros((W_out.shape[1], nch))
     for k, rs in ci.by_char.items():
@@ -118,6 +120,7 @@ def reference_cos_signal(k: int, p: int) -> np.ndarray:
     a ∈ {1,...,p-1}, b ∈ {1,...,p-1}, with θ_k(a) = 2πk·dlog(a)/(p-1). The
     target that a primary χ_k neuron cluster should reproduce."""
     from .bases import discrete_log_table
+
     _, dlog = discrete_log_table(p)
     a_dlog = np.array([dlog[a] for a in range(1, p)])
     theta = 2 * np.pi * k * a_dlog / (p - 1)

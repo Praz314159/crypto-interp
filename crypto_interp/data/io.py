@@ -54,6 +54,7 @@ def load_or_build(
     if path.exists():
         return load(path)
     from . import build as build_fn  # lazy to avoid circular import
+
     ds = build_fn(task=task, p=p, frac_train=frac_train, seed=seed)
     save(ds, path)
     return ds
@@ -63,14 +64,16 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Pre-generate and save a dataset.")
-    parser.add_argument("--cache-dir", type=Path, required=True,
-                        help="Directory to cache the dataset under.")
+    parser.add_argument(
+        "--cache-dir", type=Path, required=True, help="Directory to cache the dataset under."
+    )
     parser.add_argument("--task", type=str, required=True)
     parser.add_argument("--p", type=int, default=113)
     parser.add_argument("--frac-train", type=float, default=0.3)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--force", action="store_true",
-                        help="Regenerate even if cached file exists.")
+    parser.add_argument(
+        "--force", action="store_true", help="Regenerate even if cached file exists."
+    )
     args = parser.parse_args()
 
     path = cache_path(args.cache_dir, args.task, args.p, args.frac_train, args.seed)
@@ -79,9 +82,11 @@ if __name__ == "__main__":
         ds = load(path)
     else:
         from . import build as build_fn
-        ds = build_fn(task=args.task, p=args.p,
-                      frac_train=args.frac_train, seed=args.seed)
+
+        ds = build_fn(task=args.task, p=args.p, frac_train=args.frac_train, seed=args.seed)
         save(ds, path)
         print(f"Saved: {path}")
-    print(f"task={ds.task}, p={ds.p}, total={len(ds.inputs)}, "
-          f"train={ds.n_train}, test={ds.n_test}, vocab={ds.vocab_size}")
+    print(
+        f"task={ds.task}, p={ds.p}, total={len(ds.inputs)}, "
+        f"train={ds.n_train}, test={ds.n_test}, vocab={ds.vocab_size}"
+    )

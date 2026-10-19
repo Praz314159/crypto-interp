@@ -14,6 +14,7 @@ Usage:
     python -m crypto_interp.analysis.neuron_clusters \\
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,10 +29,11 @@ from crypto_interp.interp import (
     discrete_log_table,
     order_of,
 )
+
 # Re-export from interp for back-compat with anything still importing here:
 from crypto_interp.interp.neurons import (  # noqa: F401
-    per_neuron_dominant_char,
     cluster_signal,
+    per_neuron_dominant_char,
     reference_cos_signal,
 )
 
@@ -81,9 +83,11 @@ def main():
             ax.set_xlabel("b" + (" (dlog)" if "sorted" in title else ""))
             ax.set_ylabel("a" + (" (dlog)" if "sorted" in title else ""))
         corr = correlate(sig, ref)
-        fig.suptitle(f"Neuron cluster for character k={k} (order {order_of(k, p)}), "
-                     f"|cluster|={len(cluster)}; correlation w/ reference = {corr:+.3f}",
-                     fontsize=11)
+        fig.suptitle(
+            f"Neuron cluster for character k={k} (order {order_of(k, p)}), "
+            f"|cluster|={len(cluster)}; correlation w/ reference = {corr:+.3f}",
+            fontsize=11,
+        )
         fig.tight_layout()
         out = run_dir / f"{args.out_prefix}_k{k}.png"
         fig.savefig(out, dpi=130, bbox_inches="tight")

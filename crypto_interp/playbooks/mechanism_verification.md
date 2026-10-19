@@ -35,7 +35,8 @@ for k in K:
     if sizes[k] == 0:
         print(f"χ{k}: no dedicated cluster (helper)")
         continue
-    sig = S.cluster_signal(k); ref = S.reference_signal(k)
+    sig = S.cluster_signal(k)
+    ref = S.reference_signal(k)
     print(f"χ{k}: cluster (n={sizes[k]}) vs reference  corr = {correlate(sig, ref):+.3f}")
 ```
 
