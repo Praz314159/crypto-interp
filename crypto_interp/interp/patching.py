@@ -41,43 +41,60 @@ MetricFn = Callable[[Float[torch.Tensor, "batch pos d_vocab"]], float]
 
 def _patch_position_hook(clean_act: torch.Tensor, pos: int):
     """Closure that returns a forward-hook replacing ``act[:, pos]`` with ``clean_act[:, pos]``."""
+
     def _h(act: torch.Tensor, name: str):
         out = act.clone()
         out[:, pos] = clean_act[:, pos].to(out.dtype).to(out.device)
         return out
+
     return _h
 
 
 def _patch_all_hook(clean_act: torch.Tensor):
     """Closure that returns a forward-hook replacing the activation entirely."""
+
     def _h(act: torch.Tensor, name: str):
         return clean_act.to(act.dtype).to(act.device)
+
     return _h
 
 
 @overload
-def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: HookKey,
-              metric_fn: MetricFn, positions: None = ...,
-              ) -> Float[torch.Tensor, "pos"]: ...
+def act_patch(
+    model,
+    corrupted_inputs: Int[torch.Tensor, "batch pos"],
+    clean_cache: ActivationCache,
+    hook_name: HookKey,
+    metric_fn: MetricFn,
+    positions: None = ...,
+) -> Float[torch.Tensor, "pos"]: ...
 @overload
-def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: HookKey,
-              metric_fn: MetricFn, positions: Sequence[int] = ...,
-              ) -> Float[torch.Tensor, "n_positions"]: ...
+def act_patch(
+    model,
+    corrupted_inputs: Int[torch.Tensor, "batch pos"],
+    clean_cache: ActivationCache,
+    hook_name: HookKey,
+    metric_fn: MetricFn,
+    positions: Sequence[int] = ...,
+) -> Float[torch.Tensor, "n_positions"]: ...
 @overload
-def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: HookKey,
-              metric_fn: MetricFn, positions: str = ...,
-              ) -> float: ...
+def act_patch(
+    model,
+    corrupted_inputs: Int[torch.Tensor, "batch pos"],
+    clean_cache: ActivationCache,
+    hook_name: HookKey,
+    metric_fn: MetricFn,
+    positions: str = ...,
+) -> float: ...
 @torch.no_grad()
-def act_patch(model,
-              corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache,
-              hook_name: HookKey,
-              metric_fn: MetricFn,
-              positions: Union[Sequence[int], str, None] = None,
-              ) -> Union[torch.Tensor, float]:
+def act_patch(
+    model,
+    corrupted_inputs: Int[torch.Tensor, "batch pos"],
+    clean_cache: ActivationCache,
+    hook_name: HookKey,
+    metric_fn: MetricFn,
+    positions: Union[Sequence[int], str, None] = None,
+) -> Union[torch.Tensor, float]:
     """Causal probe — patch the clean activation at ``hook_name`` into the
     corrupted forward, run forward, measure ``metric_fn(patched_logits)``.
 
@@ -112,8 +129,7 @@ def act_patch(model,
         )
 
     if positions == "all":
-        patched = run_with_hooks(model, corrupted_inputs,
-                                 [(full_name, _patch_all_hook(clean_act))])
+        patched = run_with_hooks(model, corrupted_inputs, [(full_name, _patch_all_hook(clean_act))])
         return float(metric_fn(patched))
 
     seq = corrupted_inputs.shape[1]
@@ -125,13 +141,15 @@ def act_patch(model,
     for i, pos in enumerate(positions):
         if not (0 <= pos < seq):
             raise IndexError(f"position {pos} out of range [0, {seq})")
-        patched = run_with_hooks(model, corrupted_inputs,
-                                 [(full_name, _patch_position_hook(clean_act, pos))])
+        patched = run_with_hooks(
+            model, corrupted_inputs, [(full_name, _patch_position_hook(clean_act, pos))]
+        )
         out[i] = float(metric_fn(patched))
     return out
 
 
 # ---------- thin wrappers for common hook points ----------
+
 
 def _at(short: str, layer: int | None):
     return short if layer is None else (short, layer)
@@ -140,16 +158,22 @@ def _at(short: str, layer: int | None):
 def patch_mlp_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
     """:func:`act_patch` fixed to a block's MLP output (``blocks.<layer>.hook_mlp_out``).
     ``layer`` may be omitted in a 1-block model."""
-    return act_patch(model, corrupted_inputs, clean_cache, _at("mlp_out", layer), metric_fn, positions)
+    return act_patch(
+        model, corrupted_inputs, clean_cache, _at("mlp_out", layer), metric_fn, positions
+    )
 
 
 def patch_resid_pre(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
     """:func:`act_patch` fixed to a block's pre-attention residual stream
     (``blocks.<layer>.hook_resid_pre``). ``layer`` may be omitted in a 1-block model."""
-    return act_patch(model, corrupted_inputs, clean_cache, _at("resid_pre", layer), metric_fn, positions)
+    return act_patch(
+        model, corrupted_inputs, clean_cache, _at("resid_pre", layer), metric_fn, positions
+    )
 
 
 def patch_attn_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
     """:func:`act_patch` fixed to a block's attention output
     (``blocks.<layer>.hook_attn_out``). ``layer`` may be omitted in a 1-block model."""
-    return act_patch(model, corrupted_inputs, clean_cache, _at("attn_out", layer), metric_fn, positions)
+    return act_patch(
+        model, corrupted_inputs, clean_cache, _at("attn_out", layer), metric_fn, positions
+    )

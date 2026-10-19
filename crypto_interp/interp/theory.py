@@ -27,6 +27,7 @@ The gap between L_theory(K, α_obs) and L_empirical is the part of the model's
 behavior that **isn't** approximate-CRT with support K — a quantitative
 identification metric for the learned algorithm.
 """
+
 from __future__ import annotations
 
 from typing import Iterable, Optional
@@ -38,6 +39,7 @@ import torch
 # --------------------------------------------------------------------------
 # Kernel <-> amplitudes
 # --------------------------------------------------------------------------
+
 
 def kernel_from_amplitudes(
     alpha: np.ndarray,
@@ -98,6 +100,7 @@ def amplitudes_from_kernel(kappa: np.ndarray, p: int) -> np.ndarray:
 # Observed kernel from a model's logits grid
 # --------------------------------------------------------------------------
 
+
 def observed_kernel(
     logits_grid: torch.Tensor | np.ndarray,
     p: int,
@@ -118,9 +121,7 @@ def observed_kernel(
     n = p - 1
     L = np.asarray(logits_grid)
     if L.shape[0] != n or L.shape[1] != n or L.shape[2] < p:
-        raise ValueError(
-            f"unexpected logits_grid shape {L.shape}, expected ({n}, {n}, ≥{p})"
-        )
+        raise ValueError(f"unexpected logits_grid shape {L.shape}, expected ({n}, {n}, ≥{p})")
     # Restrict to answer-class logits and drop c=0 column.
     L_pos = L[:, :, 1:p].astype(np.float64)
 
@@ -159,6 +160,7 @@ def empirical_test_loss_from_logits(
 # --------------------------------------------------------------------------
 # High-level convenience: theory baseline for a Session
 # --------------------------------------------------------------------------
+
 
 def theory_baseline(
     session,

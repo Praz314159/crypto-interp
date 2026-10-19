@@ -69,7 +69,9 @@ def ablate_embedding(model, basis: torch.Tensor, keep_mask: torch.Tensor):
     return new_model
 
 
-def ablate_character(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex, k: int) -> torch.Tensor:
+def ablate_character(
+    W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex, k: int
+) -> torch.Tensor:
     """Gram-Schmidt-remove character ``k`` from ``W_E_values`` (d_model, p).
 
     Returns a new (d_model, p) double tensor with the projection onto each of
@@ -85,8 +87,15 @@ def ablate_character(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharInde
 
 
 @torch.no_grad()
-def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
-                         threshold: float = 0.05, loss_jump: tuple[float, float] = (0.5, 2.0)) -> dict:
+def essential_characters(
+    model,
+    ds,
+    ci: CharIndex,
+    basis: torch.Tensor,
+    *,
+    threshold: float = 0.05,
+    loss_jump: tuple[float, float] = (0.5, 2.0),
+) -> dict:
     """Per-character W_E ablation: how much does removing each character hurt?
 
     For every character k, Gram-Schmidt-ablate it from W_E and measure the
@@ -96,7 +105,7 @@ def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
     and ``K`` is the set of characters with >= ``threshold`` x max W_E energy.
     """
     from .metrics import char_energy, order_of  # local import avoids import cycle
-    from .interventions import ablate_char_w   # local import: interventions depends on ablate
+    from .interventions import ablate_char_w  # local import: interventions depends on ablate
 
     p = ds.p
     W_val = model.embed.W_E.detach()[:, :p]
@@ -111,7 +120,12 @@ def essential_characters(model, ds, ci: CharIndex, basis: torch.Tensor, *,
             test_loss = evaluate_loss(model, ds)[1]
         dlog10 = float(np.log10(test_loss) - base_log)
         cls = "vestigial" if dlog10 < lo else ("load-bearing" if dlog10 < hi else "essential")
-        per_char[k] = dict(energy=float(ce[k - 1]), ablated_loss=float(test_loss),
-                           dlog10=dlog10, order=order_of(k, p), cls=cls)
+        per_char[k] = dict(
+            energy=float(ce[k - 1]),
+            ablated_loss=float(test_loss),
+            dlog10=dlog10,
+            order=order_of(k, p),
+            cls=cls,
+        )
     K = sorted(k for k in ci.freqs if ce[k - 1] >= threshold * ce.max())
     return dict(per_char=per_char, base_loss=float(base), K=K)

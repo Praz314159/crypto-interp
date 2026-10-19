@@ -25,6 +25,7 @@ Usage:
         --tag dmodel_24_dmlp_20_wd2 \\
         --out-dir outputs/error_localization/003_dmodel_sweep_p113
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,6 +40,7 @@ from crypto_interp.interp import Session
 # ---------------------------------------------------------------------------
 # Core analysis
 # ---------------------------------------------------------------------------
+
 
 def analyze_run(run_dir: Path) -> dict:
     """Single shared pass through the logits grid; both margin and per-token views."""
@@ -73,9 +75,11 @@ def analyze_run(run_dir: Path) -> dict:
 
     # Kernel margin for reference.
     from crypto_interp.analysis.noise_decomposition import reindex_logits_by_dlog
+
     L_dlog = reindex_logits_by_dlog(S.logits_grid.detach().cpu().numpy(), p)
-    d = (np.arange(n)[:, None, None] + np.arange(n)[None, :, None]
-         - np.arange(n)[None, None, :]) % n
+    d = (
+        np.arange(n)[:, None, None] + np.arange(n)[None, :, None] - np.arange(n)[None, None, :]
+    ) % n
     kappa = np.zeros(n)
     counts = np.zeros(n)
     np.add.at(kappa, d.ravel(), L_dlog.ravel())
@@ -88,14 +92,17 @@ def analyze_run(run_dir: Path) -> dict:
     if int(wrong.sum()) > 0:
         ai, bi = np.where(wrong)
         for i, j in zip(ai[:50], bi[:50]):
-            wrong_pairs.append({
-                "a": int(i + 1), "b": int(j + 1),
-                "target": int(target[i, j]),
-                "predicted": int(predicted[i, j]),
-                "target_logit": float(target_logit[i, j]),
-                "max_alt_logit": float(max_alt[i, j]),
-                "margin": float(margin[i, j]),
-            })
+            wrong_pairs.append(
+                {
+                    "a": int(i + 1),
+                    "b": int(j + 1),
+                    "target": int(target[i, j]),
+                    "predicted": int(predicted[i, j]),
+                    "target_logit": float(target_logit[i, j]),
+                    "max_alt_logit": float(max_alt[i, j]),
+                    "margin": float(margin[i, j]),
+                }
+            )
 
     return {
         "run_dir": str(run_dir),
@@ -123,8 +130,9 @@ def analyze_run(run_dir: Path) -> dict:
 def find_outlier_tokens(err: np.ndarray, threshold_sigma: float = 3.0) -> list[tuple[int, float]]:
     """Tokens whose error rate is > mean + threshold_sigma · std. Returned 1-indexed."""
     mean, std = err.mean(), err.std()
-    out = [(i + 1, float(e)) for i, e in enumerate(err)
-           if e > mean + threshold_sigma * std and e > 0]
+    out = [
+        (i + 1, float(e)) for i, e in enumerate(err) if e > mean + threshold_sigma * std and e > 0
+    ]
     out.sort(key=lambda x: -x[1])
     return out
 
@@ -133,18 +141,23 @@ def find_outlier_tokens(err: np.ndarray, threshold_sigma: float = 3.0) -> list[t
 # Reporting
 # ---------------------------------------------------------------------------
 
+
 def print_one(d: dict) -> None:
     name = Path(d["run_dir"]).name
     print(f"\n=== {name} (p={d['p']}) ===")
-    print(f"  accuracy = {d['accuracy']:.4%}   "
-          f"wrong = {d['n_wrong']} / {d['n_total']}   "
-          f"kernel margin = {d['kernel_margin']:.4g}")
+    print(
+        f"  accuracy = {d['accuracy']:.4%}   "
+        f"wrong = {d['n_wrong']} / {d['n_total']}   "
+        f"kernel margin = {d['kernel_margin']:.4g}"
+    )
 
     m = d["margin"]
     print("  margin distribution:")
-    print(f"    min: {m.min():.4g}   1%: {np.percentile(m, 1):.4g}   "
-          f"median: {np.median(m):.4g}   "
-          f"99%: {np.percentile(m, 99):.4g}   max: {m.max():.4g}")
+    print(
+        f"    min: {m.min():.4g}   1%: {np.percentile(m, 1):.4g}   "
+        f"median: {np.median(m):.4g}   "
+        f"99%: {np.percentile(m, 99):.4g}   max: {m.max():.4g}"
+    )
 
     if d["n_wrong"] == 0:
         print("  (no errors — nothing to localize)")
@@ -154,8 +167,11 @@ def print_one(d: dict) -> None:
     b_out = find_outlier_tokens(d["err_by_b"])
     t_out_arr = d["err_by_target"][1:]
     t_mean, t_std = t_out_arr.mean(), t_out_arr.std()
-    t_out = [(i, float(e)) for i, e in enumerate(d["err_by_target"])
-             if i > 0 and e > t_mean + 3 * t_std and e > 0]
+    t_out = [
+        (i, float(e))
+        for i, e in enumerate(d["err_by_target"])
+        if i > 0 and e > t_mean + 3 * t_std and e > 0
+    ]
     t_out.sort(key=lambda x: -x[1])
 
     print(f"  >3σ outlier tokens by err rate:")
@@ -168,8 +184,10 @@ def print_one(d: dict) -> None:
 
     print(f"  first 10 incorrect (a, b):")
     for w in d["wrong_pairs"][:10]:
-        print(f"    a={w['a']:>3} b={w['b']:>3}  pred={w['predicted']:>3}  "
-              f"target={w['target']:>3}  margin={w['margin']:+.3g}")
+        print(
+            f"    a={w['a']:>3} b={w['b']:>3}  pred={w['predicted']:>3}  "
+            f"target={w['target']:>3}  margin={w['margin']:+.3g}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -177,13 +195,21 @@ def print_one(d: dict) -> None:
 # ---------------------------------------------------------------------------
 
 _REGIME_COLOR = {
-    7: "green", 8: "green", 10: "green", 12: "green",
-    13: "darkorange", 14: "darkorange",
+    7: "green",
+    8: "green",
+    10: "green",
+    12: "green",
+    13: "darkorange",
+    14: "darkorange",
     9: "red",
 }
 _REGIME_LABEL = {
-    7: "grokked", 8: "grokked", 10: "grokked", 12: "grokked",
-    13: "noisy", 14: "noisy",
+    7: "grokked",
+    8: "grokked",
+    10: "grokked",
+    12: "grokked",
+    13: "noisy",
+    14: "noisy",
     9: "CRT-fail",
 }
 
@@ -203,12 +229,17 @@ def plot_one(d: dict, out_path: Path) -> None:
     m = d["margin"].ravel()
     ax.hist(m, bins=80, color="steelblue", edgecolor="black", linewidth=0.4)
     ax.axvline(0, color="red", linestyle="--", label="0 (error boundary)")
-    ax.axvline(d["kernel_margin"], color="green", linestyle=":",
-               label=f"kernel margin = {d['kernel_margin']:.2g}")
+    ax.axvline(
+        d["kernel_margin"],
+        color="green",
+        linestyle=":",
+        label=f"kernel margin = {d['kernel_margin']:.2g}",
+    )
     ax.set_xlabel("margin = target − max_alt")
     ax.set_ylabel("# of (a, b) pairs")
-    ax.set_title(f"{Path(d['run_dir']).name} ({regime})\n"
-                 f"acc={d['accuracy']:.4%}  n_wrong={d['n_wrong']}")
+    ax.set_title(
+        f"{Path(d['run_dir']).name} ({regime})\nacc={d['accuracy']:.4%}  n_wrong={d['n_wrong']}"
+    )
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
 
@@ -218,8 +249,14 @@ def plot_one(d: dict, out_path: Path) -> None:
     tl = d["target_logit"].ravel()
     ma = d["max_alt_logit"].ravel()
     if (~correct).any():
-        ax.scatter(tl[~correct], ma[~correct], s=4, color="red", alpha=0.7,
-                   label=f"wrong (n={d['n_wrong']})")
+        ax.scatter(
+            tl[~correct],
+            ma[~correct],
+            s=4,
+            color="red",
+            alpha=0.7,
+            label=f"wrong (n={d['n_wrong']})",
+        )
     ax.scatter(tl[correct], ma[correct], s=2, color="C0", alpha=0.3, label="correct")
     lo, hi = min(tl.min(), ma.min()), max(tl.max(), ma.max())
     ax.plot([lo, hi], [lo, hi], "k--", alpha=0.3, label="margin=0")
@@ -232,11 +269,12 @@ def plot_one(d: dict, out_path: Path) -> None:
     # (c) error heatmap
     ax = axes[1][0]
     p = d["p"]
-    ax.imshow(d["wrong_mask"], cmap="Reds", aspect="auto",
-              extent=[1, p, p, 1], interpolation="nearest")
+    ax.imshow(
+        d["wrong_mask"], cmap="Reds", aspect="auto", extent=[1, p, p, 1], interpolation="nearest"
+    )
     ax.set_xlabel("b")
     ax.set_ylabel("a")
-    ax.set_title(f"where errors happen ({d['n_wrong']} / {(p-1)**2})")
+    ax.set_title(f"where errors happen ({d['n_wrong']} / {(p - 1) ** 2})")
 
     # (d) per-token error rate
     ax = axes[1][1]
@@ -262,8 +300,14 @@ def plot_population(results: list[dict], out_dir: Path) -> None:
     for d in results:
         color, regime = _seed_color_regime(d["run_dir"])
         seed = int(Path(d["run_dir"]).name.split("seed")[-1])
-        ax.hist(d["margin"].ravel(), bins=60, alpha=0.4, color=color,
-                label=f"seed {seed} ({regime})", density=True)
+        ax.hist(
+            d["margin"].ravel(),
+            bins=60,
+            alpha=0.4,
+            color=color,
+            label=f"seed {seed} ({regime})",
+            density=True,
+        )
     ax.axvline(0, color="black", linestyle="--", alpha=0.5)
     ax.set_xlabel("margin")
     ax.set_ylabel("density")
@@ -291,8 +335,9 @@ def plot_population(results: list[dict], out_dir: Path) -> None:
     for d in results:
         color, _ = _seed_color_regime(d["run_dir"])
         seed = int(Path(d["run_dir"]).name.split("seed")[-1])
-        ax.scatter([d["accuracy"]], [d["n_wrong"]], c=color, s=120,
-                   edgecolor="black", linewidth=0.6)
+        ax.scatter(
+            [d["accuracy"]], [d["n_wrong"]], c=color, s=120, edgecolor="black", linewidth=0.6
+        )
         ax.annotate(f" s{seed}", (d["accuracy"], d["n_wrong"]), fontsize=10)
     ax.set_xlabel("argmax accuracy")
     ax.set_ylabel(f"# wrong examples  (out of (p−1)²)")

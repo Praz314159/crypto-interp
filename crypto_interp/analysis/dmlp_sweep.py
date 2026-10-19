@@ -9,6 +9,7 @@ Outputs:
   data/basis_dynamics/dmlp_sweep_summary.csv
   figures/basis_dynamics/dmlp_K_summary.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,11 +26,18 @@ from crypto_interp.interp import char_energy, char_index, find_cliff, order_of
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs-dir", required=True, help="Experiment runs/ directory to scan.")
-    ap.add_argument("--out-dir", default=None,
-                    help="Where to write csv/png (default: <runs-dir>/../figures/basis_dynamics).")
+    ap.add_argument(
+        "--out-dir",
+        default=None,
+        help="Where to write csv/png (default: <runs-dir>/../figures/basis_dynamics).",
+    )
     args = ap.parse_args()
     runs_dir = Path(args.runs_dir).resolve()
-    out_dir = Path(args.out_dir).resolve() if args.out_dir else runs_dir.parent / "figures" / "basis_dynamics"
+    out_dir = (
+        Path(args.out_dir).resolve()
+        if args.out_dir
+        else runs_dir.parent / "figures" / "basis_dynamics"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pat = re.compile(r"dmodel_24_dmlp_(\d+)_seed(\d+)$")
@@ -55,7 +63,7 @@ def main():
         state = torch.load(last_ck, weights_only=False, map_location="cpu")
         W_E = state["model_state"]["embed.W_E"].double()
         if p is None:
-            p = W_E.shape[1] - 1               # vocab = p + 1
+            p = W_E.shape[1] - 1  # vocab = p + 1
             basis, ci = char_index(p)
         char_E = char_energy(W_E[:, :p], basis, ci)
         K = sorted(int(k + 1) for k, e in enumerate(char_E) if e >= 0.05 * char_E.max())
@@ -70,29 +78,63 @@ def main():
             losses = torch.load(losses_path, weights_only=False)
             cliff = find_cliff(losses["test_losses"])
 
-        rows.append(dict(d_mlp=d_mlp, seed=seed, K=K, K_size=len(K), orders=orders,
-                         n_primitive=n_prim, d_mlp_cost=d_mlp_cost,
-                         has_legendre=has_leg, cliff=cliff))
+        rows.append(
+            dict(
+                d_mlp=d_mlp,
+                seed=seed,
+                K=K,
+                K_size=len(K),
+                orders=orders,
+                n_primitive=n_prim,
+                d_mlp_cost=d_mlp_cost,
+                has_legendre=has_leg,
+                cliff=cliff,
+            )
+        )
 
-    print(f"{'d_mlp':>5} {'seed':>4}  {'cliff':>6} {'|K|':>3} {'cost':>5} "
-          f"{'#prim':>5} {'Leg':>3}   orders                       K")
+    print(
+        f"{'d_mlp':>5} {'seed':>4}  {'cliff':>6} {'|K|':>3} {'cost':>5} "
+        f"{'#prim':>5} {'Leg':>3}   orders                       K"
+    )
     for r in rows:
         cliff_s = "-" if r["cliff"] is None else str(r["cliff"])
         leg = "Y" if r["has_legendre"] else "."
-        print(f"{r['d_mlp']:>5} {r['seed']:>4}  {cliff_s:>6} {r['K_size']:>3} "
-              f"{r['d_mlp_cost']:>5} {r['n_primitive']:>5} {leg:>3}   "
-              f"{str(r['orders']):<28}  {r['K']}")
+        print(
+            f"{r['d_mlp']:>5} {r['seed']:>4}  {cliff_s:>6} {r['K_size']:>3} "
+            f"{r['d_mlp_cost']:>5} {r['n_primitive']:>5} {leg:>3}   "
+            f"{str(r['orders']):<28}  {r['K']}"
+        )
 
     csv_path = out_dir / "dmlp_sweep_summary.csv"
     with open(csv_path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["d_mlp", "seed", "K", "K_size", "orders", "n_primitive",
-                    "d_mlp_cost", "has_legendre", "cliff"])
+        w.writerow(
+            [
+                "d_mlp",
+                "seed",
+                "K",
+                "K_size",
+                "orders",
+                "n_primitive",
+                "d_mlp_cost",
+                "has_legendre",
+                "cliff",
+            ]
+        )
         for r in rows:
-            w.writerow([r["d_mlp"], r["seed"], "|".join(map(str, r["K"])), r["K_size"],
-                        "|".join(map(str, r["orders"])), r["n_primitive"], r["d_mlp_cost"],
-                        "Y" if r["has_legendre"] else "N",
-                        r["cliff"] if r["cliff"] is not None else ""])
+            w.writerow(
+                [
+                    r["d_mlp"],
+                    r["seed"],
+                    "|".join(map(str, r["K"])),
+                    r["K_size"],
+                    "|".join(map(str, r["orders"])),
+                    r["n_primitive"],
+                    r["d_mlp_cost"],
+                    "Y" if r["has_legendre"] else "N",
+                    r["cliff"] if r["cliff"] is not None else "",
+                ]
+            )
     print(f"\nSaved {csv_path}")
 
     dmlps = sorted(set(r["d_mlp"] for r in rows))
@@ -107,8 +149,11 @@ def main():
         ys = [r[key] for d in dmlps for r in by_d[d]]
         ax.scatter(xs, ys, s=80, alpha=0.75, edgecolor="black", linewidth=0.4)
         ax.set_xscale("log", base=2)
-        ax.set_xticks(dmlps); ax.set_xticklabels([str(d) for d in dmlps])
-        ax.set_xlabel("d_mlp budget"); ax.set_ylabel(ylab); ax.set_title(title)
+        ax.set_xticks(dmlps)
+        ax.set_xticklabels([str(d) for d in dmlps])
+        ax.set_xlabel("d_mlp budget")
+        ax.set_ylabel(ylab)
+        ax.set_title(title)
         ax.grid(True, alpha=0.3)
         if key == "d_mlp_cost":
             ax.plot(dmlps, dmlps, "k--", lw=0.7, alpha=0.5, label="cost = budget")

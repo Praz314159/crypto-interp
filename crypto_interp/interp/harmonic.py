@@ -7,6 +7,7 @@ Fourier frequency. A *primary* destroys its own frequency (dominant == k); a
 doubling signature. ``find_primary_helper_pairs`` is the per-prime test of the
 harmonic-helper finding. Prime-parametric.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -37,6 +38,7 @@ def delta_k(model, ds, ci: CharIndex, basis, k: int, *, logits_full=None) -> np.
     ``logit_full - logit_ablated``, shape (p-1, p-1, vocab) as a numpy array.
     Pass ``logits_full`` (a torch grid) to avoid recomputing it across calls."""
     from .interventions import ablate_char_w
+
     full = compute_logits_grid(model, ds) if logits_full is None else logits_full
     with ablate_char_w(model, k, basis, ci):
         ablated = compute_logits_grid(model, ds)

@@ -22,6 +22,7 @@ Usage:
         --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1 \\
         --a 7 --b 12
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,6 +39,7 @@ from crypto_interp.interp.bases import discrete_log_table
 # ---------------------------------------------------------------------------
 # Geometry helpers
 # ---------------------------------------------------------------------------
+
 
 def char_plane(S: Session, k: int) -> tuple[np.ndarray, np.ndarray]:
     """Orthonormal 2D frame (e1, e2) of character k's plane in embedding space."""
@@ -60,8 +62,9 @@ def token_coords(S: Session, e1: np.ndarray, e2: np.ndarray) -> np.ndarray:
     return np.stack([e1 @ W_E, e2 @ W_E], axis=1)
 
 
-def neuron_phases(S: Session, k: int, cluster: np.ndarray,
-                  e1: np.ndarray, e2: np.ndarray) -> np.ndarray:
+def neuron_phases(
+    S: Session, k: int, cluster: np.ndarray, e1: np.ndarray, e2: np.ndarray
+) -> np.ndarray:
     """Preferred phase φ_i of each cluster neuron, from its input weights."""
     W_in = S.model.blocks[0].mlp.W_in.detach().double().numpy()  # (d_mlp, d_model)
     return np.array([np.arctan2(W_in[i] @ e2, W_in[i] @ e1) for i in cluster])
@@ -70,6 +73,7 @@ def neuron_phases(S: Session, k: int, cluster: np.ndarray,
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
+
 
 def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     p = S.ds.p
@@ -93,7 +97,7 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     logits, cache = S.run_with_cache(inp)
     L = logits[0, -1, :p].detach().double().numpy()
     attn = cache["blocks.0.attn.hook_attn"][0, :, -1, :].detach().numpy()  # (heads, 3)
-    mlp_post = cache["mlp_post"][0, -1, :].detach().double().numpy()       # (d_mlp,)
+    mlp_post = cache["mlp_post"][0, -1, :].detach().double().numpy()  # (d_mlp,)
 
     ncol = len(K) + 1
     fig = plt.figure(figsize=(3.1 * ncol, 9.6))
@@ -105,11 +109,11 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
         e1, e2 = char_plane(S, k)
         pts = token_coords(S, e1, e2)
         ax.scatter(pts[:, 0], pts[:, 1], s=6, c="lightgray", zorder=1)
-        for tok, color, lab in ((a % p, "C0", "a"), (b % p, "C1", "b"),
-                                (ans, "C2", "a·b")):
+        for tok, color, lab in ((a % p, "C0", "a"), (b % p, "C1", "b"), (ans, "C2", "a·b")):
             x, y = pts[tok - 1]
-            ax.annotate("", xy=(x, y), xytext=(0, 0),
-                        arrowprops=dict(arrowstyle="->", color=color, lw=2))
+            ax.annotate(
+                "", xy=(x, y), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color=color, lw=2)
+            )
             ax.annotate(f"{lab}={tok}", xy=(x, y), fontsize=8, color=color)
         role = f"helper of χ_{helpers[k]}" if k in helpers else "primary"
         ax.set_title(f"χ_{k} clock ({role})", fontsize=9)
@@ -118,7 +122,7 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
 
     ax = fig.add_subplot(gs[0, ncol - 1])
     im = ax.imshow(attn, cmap="Blues", vmin=0, vmax=1, aspect="auto")
-    ax.set_xticks(range(3), [f"a={a%p}", f"b={b%p}", "="])
+    ax.set_xticks(range(3), [f"a={a % p}", f"b={b % p}", "="])
     ax.set_yticks(range(attn.shape[0]), [f"head {h}" for h in range(attn.shape[0])])
     ax.set_title("attention from '='", fontsize=9)
     fig.colorbar(im, ax=ax, fraction=0.046)
@@ -129,25 +133,22 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
         cluster = np.where(dom == k)[0]
         target = (theta(k, a) + theta(k, b)) % (2 * np.pi)
         if len(cluster) == 0:
-            ax.set_yticks([]); ax.set_xticks([])
-            note = (f"no neurons:\nrides χ_{helpers[k]}'s cluster"
-                    if k in helpers else "no neurons")
-            ax.annotate(note, xy=(0.5, 0.5), xycoords="axes fraction",
-                        ha="center", fontsize=8)
+            ax.set_yticks([])
+            ax.set_xticks([])
+            note = f"no neurons:\nrides χ_{helpers[k]}'s cluster" if k in helpers else "no neurons"
+            ax.annotate(note, xy=(0.5, 0.5), xycoords="axes fraction", ha="center", fontsize=8)
             ax.set_title(f"χ_{k} cluster (0 neurons)", fontsize=9)
             continue
         phis = neuron_phases(S, k, cluster, *char_plane(S, k))
         acts = mlp_post[cluster]
         amax = max(acts.max(), 1e-9)
-        ax.bar(phis, acts, width=2 * np.pi / max(len(phis), 8) * 0.8,
-               color="C0", alpha=0.75)
+        ax.bar(phis, acts, width=2 * np.pi / max(len(phis), 8) * 0.8, color="C0", alpha=0.75)
         # The bump should point at ±target (real basis can't fix the sign).
         for sgn, ls in ((1, "-"), (-1, "--")):
-            ax.plot([sgn * target] * 2, [0, amax], color="C3",
-                    linestyle=ls, lw=1.5)
-        ax.set_title(f"χ_{k} cluster ({len(cluster)} neurons)\n"
-                     f"red: ±θ_{k}(a)+θ_{k}(b)", fontsize=8)
-        ax.set_yticks([]); ax.tick_params(labelsize=6)
+            ax.plot([sgn * target] * 2, [0, amax], color="C3", linestyle=ls, lw=1.5)
+        ax.set_title(f"χ_{k} cluster ({len(cluster)} neurons)\nred: ±θ_{k}(a)+θ_{k}(b)", fontsize=8)
+        ax.set_yticks([])
+        ax.tick_params(labelsize=6)
 
     ax = fig.add_subplot(gs[1, ncol - 1])
     ax.axis("off")
@@ -158,7 +159,11 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
         f"answer a·b mod p = {ans}\n\n"
         f"K = {K}\n"
         f"helpers: {helpers or 'none'}",
-        xy=(0.05, 0.5), xycoords="axes fraction", fontsize=9, va="center")
+        xy=(0.05, 0.5),
+        xycoords="axes fraction",
+        fontsize=9,
+        va="center",
+    )
 
     # ---- Row 3: interference ---------------------------------------------
     # Decompose THIS forward pass's logits per character, in dlog order.
@@ -181,16 +186,23 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
         offset += span
     ax.plot(xs, total + offset, color="black", lw=1.4, label="Σ over K")
     Lc = L[toks_by_dlog]
-    ax.plot(xs, (Lc - Lc.mean()) + offset, color="gray", lw=0.8, alpha=0.6,
-            label="actual logits")
+    ax.plot(xs, (Lc - Lc.mean()) + offset, color="gray", lw=0.8, alpha=0.6, label="actual logits")
     ax.axvline(x_ans, color="C2", lw=1.2, linestyle=":")
-    ax.annotate(f"dlog(ab) = {x_ans}", xy=(x_ans, ax.get_ylim()[1]),
-                fontsize=8, color="C2", ha="center", va="bottom")
+    ax.annotate(
+        f"dlog(ab) = {x_ans}",
+        xy=(x_ans, ax.get_ylim()[1]),
+        fontsize=8,
+        color="C2",
+        ha="center",
+        va="bottom",
+    )
     ax.set_xlabel("candidate c, ordered by dlog(c)")
     ax.set_yticks([])
     ax.legend(fontsize=8, ncol=len(K) + 2, loc="lower left")
-    ax.set_title("per-character logit waves (each coset-ambiguous) → "
-                 "constructive interference at c = a·b", fontsize=10)
+    ax.set_title(
+        "per-character logit waves (each coset-ambiguous) → constructive interference at c = a·b",
+        fontsize=10,
+    )
 
     fig.suptitle(f"{a} × {b} ≡ {ans}  (mod {p})", fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
@@ -202,8 +214,13 @@ def main():
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--a", type=int, required=True)
     ap.add_argument("--b", type=int, required=True)
-    ap.add_argument("--ks", type=int, nargs="*", default=None,
-                    help="Character set override (default: essential K).")
+    ap.add_argument(
+        "--ks",
+        type=int,
+        nargs="*",
+        default=None,
+        help="Character set override (default: essential K).",
+    )
     ap.add_argument("--out-file", default=None)
     args = ap.parse_args()
 

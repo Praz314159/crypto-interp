@@ -3,6 +3,7 @@
 Consolidates the per-script ``compute_logits_grid`` / ``compute_mlp_output_grid``
 helpers. Prime-parametric (everything derives from ``ds.p``).
 """
+
 from __future__ import annotations
 
 import torch
@@ -31,6 +32,7 @@ def compute_logits_grid(model, ds, W_E_override: torch.Tensor | None = None) -> 
         logits = model(inputs)[:, -1, :].double()
     else:
         from .interventions import weight_patch
+
         with weight_patch(model, "embed.W_E", W_E_override):
             logits = model(inputs)[:, -1, :].double()
     return logits.reshape(p - 1, p - 1, -1)

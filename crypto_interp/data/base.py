@@ -15,12 +15,12 @@ import torch
 class Dataset:
     p: int
     task: str
-    inputs: torch.Tensor       # (N, 3) long
-    labels: torch.Tensor       # (N,) long
-    train_mask: torch.Tensor   # (N,) bool
-    test_mask: torch.Tensor    # (N,) bool
+    inputs: torch.Tensor  # (N, 3) long
+    labels: torch.Tensor  # (N,) long
+    train_mask: torch.Tensor  # (N,) bool
+    test_mask: torch.Tensor  # (N,) bool
     vocab_size: int
-    n_answer_tokens: int       # how many indices logits[:, -1, :n_answer_tokens] covers
+    n_answer_tokens: int  # how many indices logits[:, -1, :n_answer_tokens] covers
     eq_token: int
 
     @property
@@ -63,7 +63,13 @@ def assemble(
     test_mask = ~train_mask
 
     return Dataset(
-        p=p, task=task, inputs=inputs, labels=labels_t,
-        train_mask=train_mask, test_mask=test_mask,
-        vocab_size=vocab_size, n_answer_tokens=n_answer_tokens, eq_token=eq_token,
+        p=p,
+        task=task,
+        inputs=inputs,
+        labels=labels_t,
+        train_mask=train_mask,
+        test_mask=test_mask,
+        vocab_size=vocab_size,
+        n_answer_tokens=n_answer_tokens,
+        eq_token=eq_token,
     )

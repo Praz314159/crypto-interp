@@ -1,4 +1,5 @@
 """Hook-name resolution in 1-block and multi-block models."""
+
 import pytest
 import torch
 
@@ -9,8 +10,11 @@ from crypto_interp.models import Transformer, TransformerConfig
 @pytest.fixture(scope="module")
 def two_layer():
     torch.manual_seed(0)
-    model = Transformer(TransformerConfig(d_vocab=8, d_model=8, d_mlp=16, num_heads=2,
-                                          d_head=4, n_ctx=3, num_layers=2))
+    model = Transformer(
+        TransformerConfig(
+            d_vocab=8, d_model=8, d_mlp=16, num_heads=2, d_head=4, n_ctx=3, num_layers=2
+        )
+    )
     inputs = torch.tensor([[a, b, 7] for a in range(7) for b in range(7)])
     return model, inputs
 

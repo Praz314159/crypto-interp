@@ -10,6 +10,7 @@ Usage:
         --runs 'experiments/004_p127/runs/dmodel_24_dmlp_32_seed*' \\
         --source runpod-a100
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,8 +46,9 @@ def backfill_one(run_dir: Path, source: str, force: bool) -> str:
         pass
 
     mtimes = [p.stat().st_mtime for _, p in ckpts]
-    fmt = lambda t: datetime.datetime.fromtimestamp(
-        t, tz=datetime.timezone.utc).isoformat(timespec="seconds")
+    fmt = lambda t: datetime.datetime.fromtimestamp(t, tz=datetime.timezone.utc).isoformat(
+        timespec="seconds"
+    )
 
     manifest = {
         "backfilled": True,
@@ -64,12 +66,15 @@ def backfill_one(run_dir: Path, source: str, force: bool) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", required=True,
-                    help="Glob of run dirs, e.g. 'experiments/004_p127/runs/*'")
-    ap.add_argument("--source", default="unknown",
-                    help="Provenance label: colab | local-cpu | runpod-a100 | unknown")
-    ap.add_argument("--force", action="store_true",
-                    help="Overwrite existing manifests.")
+    ap.add_argument(
+        "--runs", required=True, help="Glob of run dirs, e.g. 'experiments/004_p127/runs/*'"
+    )
+    ap.add_argument(
+        "--source",
+        default="unknown",
+        help="Provenance label: colab | local-cpu | runpod-a100 | unknown",
+    )
+    ap.add_argument("--force", action="store_true", help="Overwrite existing manifests.")
     args = ap.parse_args()
 
     dirs = sorted(Path(d) for d in glob.glob(args.runs) if Path(d).is_dir())

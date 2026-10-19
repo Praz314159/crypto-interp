@@ -7,12 +7,28 @@ from crypto_interp.models import Transformer, TransformerConfig
 def test_load_run_keeps_architecture(tmp_path):
     """A 2-layer checkpoint loads as a 2-layer model with identical weights."""
     p = 7
-    cfg = {"task": "mul", "p": p, "frac_train": 0.3, "seed": 0,
-           "d_model": 8, "d_mlp": 16, "num_heads": 2, "d_head": 4,
-           "n_ctx": 3, "num_layers": 2}
+    cfg = {
+        "task": "mul",
+        "p": p,
+        "frac_train": 0.3,
+        "seed": 0,
+        "d_model": 8,
+        "d_mlp": 16,
+        "num_heads": 2,
+        "d_head": 4,
+        "n_ctx": 3,
+        "num_layers": 2,
+    }
     torch.manual_seed(0)
-    model = Transformer(TransformerConfig(d_vocab=p + 1, **{
-        k: cfg[k] for k in ("d_model", "d_mlp", "num_heads", "d_head", "n_ctx", "num_layers")}))
+    model = Transformer(
+        TransformerConfig(
+            d_vocab=p + 1,
+            **{
+                k: cfg[k]
+                for k in ("d_model", "d_mlp", "num_heads", "d_head", "n_ctx", "num_layers")
+            },
+        )
+    )
     ckpt = tmp_path / "run" / "checkpoint_000000.pt"
     ckpt.parent.mkdir()
     torch.save({"model_state": model.state_dict(), "config": cfg}, ckpt)

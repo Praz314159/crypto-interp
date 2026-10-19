@@ -33,9 +33,8 @@ def per_frequency_energy_from_embedding(
         ``k = 1, 2, ..., (p-1-1)//2`` and then ``k = (p-1)/2`` if ``p-1`` is even.
         Per-frequency energy is the sum of cos and sin contributions for that k.
     """
-    coef = torch.einsum("kp,dp->kd", mul_basis.to(torch.float64),
-                         W_E_values.to(torch.float64))
-    per_basis_energy = (coef ** 2).sum(dim=1)  # (p,)
+    coef = torch.einsum("kp,dp->kd", mul_basis.to(torch.float64), W_E_values.to(torch.float64))
+    per_basis_energy = (coef**2).sum(dim=1)  # (p,)
     n = p - 1
     freq_e: list[float] = []
     for k in range(1, (n - 1) // 2 + 1):
@@ -59,6 +58,7 @@ class EmbeddingEnergyTracker:
 
     def __init__(self, p: int, device: str | torch.device = "cpu"):
         from .bases import multiplicative_fourier_basis
+
         self.p = p
         basis, _, _ = multiplicative_fourier_basis(p, device="cpu")
         self.basis = basis.to(device)
@@ -90,12 +90,13 @@ class EmbeddingEnergyTracker:
 
 # ---------- Per-character energy (keyed by CharIndex) ----------
 
+
 def char_energy(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex) -> np.ndarray:
     """Per-character energy of ``W_E_values`` (d_model, p), as a numpy array
     indexed by ``k-1`` (length ``max(ci.freqs)``). Same quantity as
     ``per_frequency_energy_from_embedding`` (re-keyed for script use)."""
     coef = torch.einsum("kp,dp->kd", basis.to(torch.float64), W_E_values.to(torch.float64))
-    E = (coef ** 2).sum(dim=1)
+    E = (coef**2).sum(dim=1)
     out = np.zeros(max(ci.freqs))
     for k, rows in ci.by_char.items():
         out[k - 1] = float(E[rows].sum())
@@ -106,7 +107,7 @@ def char_energy_batch(W_E_stack: torch.Tensor, basis: torch.Tensor, ci: CharInde
     """Per-character energy over a time axis. ``W_E_stack`` is (T, d_model, p);
     returns (T, max(ci.freqs))."""
     coef = torch.einsum("kp,tdp->tkd", basis.to(torch.float64), W_E_stack.to(torch.float64))
-    E = (coef ** 2).sum(dim=2)  # (T, n_basis)
+    E = (coef**2).sum(dim=2)  # (T, n_basis)
     out = np.zeros((W_E_stack.shape[0], max(ci.freqs)))
     for k, rows in ci.by_char.items():
         out[:, k - 1] = E[:, rows].sum(dim=1).cpu().numpy()
@@ -125,6 +126,7 @@ def order_energy(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex) -
 
 # ---------- Small reusable metrics ----------
 
+
 def order_of(k: int, p: int) -> int:
     """Multiplicative order of character k in the character group of (Z/p)*."""
     n = p - 1
@@ -134,7 +136,9 @@ def order_of(k: int, p: int) -> int:
 def correlate(x, y) -> float:
     """Mean-centered cosine similarity (Pearson correlation) of two same-shape arrays."""
     if x is None or y is None:
-        raise ValueError("correlate got None (e.g. Session.cluster_signal for a character with no neurons)")
+        raise ValueError(
+            "correlate got None (e.g. Session.cluster_signal for a character with no neurons)"
+        )
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     if x.shape != y.shape:

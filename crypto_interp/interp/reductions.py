@@ -7,6 +7,7 @@ vs value-restricted column == c-1) -- the recurring off-by-one. Here it lives
 in ONE function with an explicit ``value_axis`` flag; both conventions, fed
 correctly-shaped inputs, produce identical results.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -20,7 +21,7 @@ def reduce_to_ab(delta_abc, p: int) -> np.ndarray:
     arr = np.asarray(delta_abc, dtype=np.float64)
     n = p - 1
     a = np.arange(1, p)
-    ab = (a[:, None] * a[None, :]) % p              # (n, n), in 1..p-1
+    ab = (a[:, None] * a[None, :]) % p  # (n, n), in 1..p-1
     out = np.zeros((n, arr.shape[-1]))
     cnt = np.zeros(n)
     np.add.at(out, ab.ravel() - 1, arr.reshape(-1, arr.shape[-1]))
@@ -45,27 +46,27 @@ def reduce_to_diff(delta_abc, p: int, *, value_axis: str = "full") -> np.ndarray
     C = arr.shape[-1]
 
     _, dlog = discrete_log_table(p)
-    dlog_of_value = np.array([dlog[v] for v in range(1, p)])   # index v-1 -> dlog(v)
+    dlog_of_value = np.array([dlog[v] for v in range(1, p)])  # index v-1 -> dlog(v)
 
     if value_axis == "full":
         if C not in (p, p + 1):
             raise ValueError(f"value_axis='full' expects vocab columns (p or p+1), got C={C}")
-        col_idx = np.arange(1, p)            # columns 1..p-1 are values 1..p-1
+        col_idx = np.arange(1, p)  # columns 1..p-1 are values 1..p-1
     elif value_axis == "values":
         if C != n:
             raise ValueError(f"value_axis='values' expects p-1 columns, got C={C}")
-        col_idx = np.arange(n)               # column j -> value j+1
+        col_idx = np.arange(n)  # column j -> value j+1
     else:
         raise ValueError(f"value_axis must be 'full' or 'values', got {value_axis!r}")
 
-    sub = arr[:, :, col_idx]                  # (n, n, n), last axis = c=1..p-1 in order
-    j_c = dlog_of_value                       # (n,) dlog of value c=1..p-1
+    sub = arr[:, :, col_idx]  # (n, n, n), last axis = c=1..p-1 in order
+    j_c = dlog_of_value  # (n,) dlog of value c=1..p-1
 
     a = np.arange(1, p)
-    ab = (a[:, None] * a[None, :]) % p        # (n, n)
-    j_ab = dlog_of_value[ab - 1]              # (n, n)
+    ab = (a[:, None] * a[None, :]) % p  # (n, n)
+    j_ab = dlog_of_value[ab - 1]  # (n, n)
 
-    delta = (j_c[None, None, :] - j_ab[:, :, None]) % n        # (n, n, n)
+    delta = (j_c[None, None, :] - j_ab[:, :, None]) % n  # (n, n, n)
     out = np.zeros(n)
     cnt = np.zeros(n)
     np.add.at(out, delta.ravel(), sub.ravel())
@@ -80,7 +81,7 @@ def fourier_spectrum_1d(f_diff) -> np.ndarray:
     N = len(f)
     dl = np.arange(N)
     ms = np.arange(1, N // 2 + 1)
-    ang = 2 * np.pi * np.outer(ms, dl) / N            # (n_m, N)
+    ang = 2 * np.pi * np.outer(ms, dl) / N  # (n_m, N)
     cos_proj = (f[None, :] * np.cos(ang)).sum(axis=1)
     sin_proj = (f[None, :] * np.sin(ang)).sum(axis=1)
-    return cos_proj ** 2 + sin_proj ** 2
+    return cos_proj**2 + sin_proj**2

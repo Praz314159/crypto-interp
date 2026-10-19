@@ -9,6 +9,7 @@ Usage:
     python -m crypto_interp.analysis.check_grokking \
         --runs-dir experiments/003_dmodel_sweep_p113/runs
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,13 +24,15 @@ def classify(status: dict) -> str:
     if status["grokked"]:
         return "grokked"
     if status["memorized_step"] is not None:
-        return "memorized-only"   # fit train, never grokked => below the floor / failure
-    return "no-fit"               # never even memorized
+        return "memorized-only"  # fit train, never grokked => below the floor / failure
+    return "no-fit"  # never even memorized
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs-dir", type=str, required=True, help="Experiment runs/ directory to scan.")
+    ap.add_argument(
+        "--runs-dir", type=str, required=True, help="Experiment runs/ directory to scan."
+    )
     ap.add_argument("--grok-thresh", type=float, default=0.1)
     ap.add_argument("--mem-thresh", type=float, default=0.1)
     args = ap.parse_args()
@@ -41,8 +44,12 @@ def main():
         if not d.is_dir() or not lp.exists():
             continue
         losses = torch.load(lp, weights_only=False)
-        st = grokking_status(losses["train_losses"], losses["test_losses"],
-                             mem_thresh=args.mem_thresh, grok_thresh=args.grok_thresh)
+        st = grokking_status(
+            losses["train_losses"],
+            losses["test_losses"],
+            mem_thresh=args.mem_thresh,
+            grok_thresh=args.grok_thresh,
+        )
         rows.append((d.name, st, classify(st)))
 
     if not rows:

@@ -20,6 +20,7 @@
 Usage:
     python -m crypto_interp.analysis.verify_helper_mechanism [--out-dir DIR]
 """
+
 from __future__ import annotations
 
 import math
@@ -48,13 +49,13 @@ def relu_fourier_check():
     print("=" * 70)
     print("(A) Fourier coefficients")
     print("-" * 70)
-    print(f"  ReLU(cos): a0  = {coeff(relu,0):.5f}   (1/pi      = {1/math.pi:.5f})")
-    print(f"  ReLU(cos): a1  = {coeff(relu,1):.5f}   (1/2       = {0.5:.5f})")
-    print(f"  ReLU(cos): a2  = {coeff(relu,2):.5f}   (2/(3pi)   = {2/(3*math.pi):.5f})")
-    print(f"  ReLU(cos): a3  = {coeff(relu,3):.5f}   (0         = 0.00000)")
-    print(f"  ReLU(cos): a4  = {coeff(relu,4):.5f}   (-2/(15pi) = {-2/(15*math.pi):.5f})")
+    print(f"  ReLU(cos): a0  = {coeff(relu, 0):.5f}   (1/pi      = {1 / math.pi:.5f})")
+    print(f"  ReLU(cos): a1  = {coeff(relu, 1):.5f}   (1/2       = {0.5:.5f})")
+    print(f"  ReLU(cos): a2  = {coeff(relu, 2):.5f}   (2/(3pi)   = {2 / (3 * math.pi):.5f})")
+    print(f"  ReLU(cos): a3  = {coeff(relu, 3):.5f}   (0         = 0.00000)")
+    print(f"  ReLU(cos): a4  = {coeff(relu, 4):.5f}   (-2/(15pi) = {-2 / (15 * math.pi):.5f})")
     print()
-    print(f"  |cos|    : a2  = {coeff(absc,2):.5f}   (4/(3pi)   = {4/(3*math.pi):.5f})")
+    print(f"  |cos|    : a2  = {coeff(absc, 2):.5f}   (4/(3pi)   = {4 / (3 * math.pi):.5f})")
     print()
 
 
@@ -103,36 +104,52 @@ def bilinear_check(n=112, primary=10, widths=(1, 2, 3, 4, 6, 8), n_seeds=4, out_
     helper = 2 * primary
     Xa_p = features(ja, n, [primary])
     Xb_p = features(jb, n, [primary])
-    X_prim = torch.cat([Xa_p, Xb_p], dim=-1)                       # 4 features
+    X_prim = torch.cat([Xa_p, Xb_p], dim=-1)  # 4 features
 
     Xa_h = features(ja, n, [primary, helper])
     Xb_h = features(jb, n, [primary, helper])
-    X_help = torch.cat([Xa_h, Xb_h], dim=-1)                       # 8 features
+    X_help = torch.cat([Xa_h, Xb_h], dim=-1)  # 8 features
 
     print("=" * 70)
     print(f"(B) Bilinear approx of cos({primary}(phi_a+phi_b)) on Z_{n} grid")
-    print(f"    primary k={primary} (order {n//math.gcd(primary,n)}), "
-          f"helper 2k={helper} (order {n//math.gcd(helper,n)})")
+    print(
+        f"    primary k={primary} (order {n // math.gcd(primary, n)}), "
+        f"helper 2k={helper} (order {n // math.gcd(helper, n)})"
+    )
     print("-" * 70)
     print(f"  {'width':>5} | {'primary-only FVU':>18} | {'primary+helper FVU':>20} | {'ratio':>7}")
     ep_list, eh_list = [], []
     for w in widths:
         e_p = np.median([fit_mlp(X_prim, target, w, seed=s) for s in range(n_seeds)])
         e_h = np.median([fit_mlp(X_help, target, w, seed=s) for s in range(n_seeds)])
-        ep_list.append(e_p); eh_list.append(e_h)
-        print(f"  {w:>5} | {e_p:>18.4e} | {e_h:>20.4e} | {e_p/max(e_h,1e-12):>7.2f}")
+        ep_list.append(e_p)
+        eh_list.append(e_h)
+        print(f"  {w:>5} | {e_p:>18.4e} | {e_h:>20.4e} | {e_p / max(e_h, 1e-12):>7.2f}")
     print()
 
     fig, ax = plt.subplots(figsize=(6.2, 4.2))
-    ax.plot(widths, ep_list, "o-", color="#d62728", lw=1.8,
-            label=fr"primary only $\{{\chi_{{{primary}}}\}}$")
-    ax.plot(widths, eh_list, "s-", color="#1f77b4", lw=1.8,
-            label=fr"primary + helper $\{{\chi_{{{primary}}}, \chi_{{{helper}}}\}}$")
+    ax.plot(
+        widths,
+        ep_list,
+        "o-",
+        color="#d62728",
+        lw=1.8,
+        label=rf"primary only $\{{\chi_{{{primary}}}\}}$",
+    )
+    ax.plot(
+        widths,
+        eh_list,
+        "s-",
+        color="#1f77b4",
+        lw=1.8,
+        label=rf"primary + helper $\{{\chi_{{{primary}}}, \chi_{{{helper}}}\}}$",
+    )
     ax.set_yscale("log")
     ax.set_xlabel("MLP width (# ReLU neurons)")
     ax.set_ylabel("fraction of variance unexplained (FVU)")
-    ax.set_title(fr"Approximating $\cos({primary}(\varphi_a+\varphi_b))$ with a ReLU MLP")
-    ax.legend(); ax.grid(True, alpha=0.3, which="both")
+    ax.set_title(rf"Approximating $\cos({primary}(\varphi_a+\varphi_b))$ with a ReLU MLP")
+    ax.legend()
+    ax.grid(True, alpha=0.3, which="both")
     fig.tight_layout()
     out = Path(out_dir) / "helper_mechanism_fvu.png"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -151,28 +168,35 @@ def sylow_contrast(n=112, n_seeds=4, width=2):
     print(f"(C) Sylow contrast at width={width}: error reduction from helper")
     print("-" * 70)
     cases = [
-        ("Sylow-2 descent", 10),   # 10->20, order 56 -> 28 (proper descent)
-        ("Sylow-2 descent", 3),    # 3 ->6,  order 112-> 56 (proper descent)
-        ("Sylow-7 only",    16),   # 16->32, order 7  -> 7  (no descent)
+        ("Sylow-2 descent", 10),  # 10->20, order 56 -> 28 (proper descent)
+        ("Sylow-2 descent", 3),  # 3 ->6,  order 112-> 56 (proper descent)
+        ("Sylow-7 only", 16),  # 16->32, order 7  -> 7  (no descent)
     ]
     ja, jb = torch.meshgrid(torch.arange(n), torch.arange(n), indexing="ij")
-    ja = ja.reshape(-1).double(); jb = jb.reshape(-1).double()
-    print(f"  {'case':>16} | {'k':>3} | {'ord(k)':>6} | {'ord(2k)':>7} | "
-          f"{'FVU prim':>10} | {'FVU help':>10} | {'ratio':>6}")
+    ja = ja.reshape(-1).double()
+    jb = jb.reshape(-1).double()
+    print(
+        f"  {'case':>16} | {'k':>3} | {'ord(k)':>6} | {'ord(2k)':>7} | "
+        f"{'FVU prim':>10} | {'FVU help':>10} | {'ratio':>6}"
+    )
     for label, k in cases:
         tgt = torch.cos(2 * math.pi * k * (ja + jb) / n)
-        Xp = torch.cat([features(ja, n, [k]),      features(jb, n, [k])], -1)
-        Xh = torch.cat([features(ja, n, [k, 2*k]), features(jb, n, [k, 2*k])], -1)
+        Xp = torch.cat([features(ja, n, [k]), features(jb, n, [k])], -1)
+        Xh = torch.cat([features(ja, n, [k, 2 * k]), features(jb, n, [k, 2 * k])], -1)
         e_p = np.median([fit_mlp(Xp, tgt, width, seed=s) for s in range(n_seeds)])
         e_h = np.median([fit_mlp(Xh, tgt, width, seed=s) for s in range(n_seeds)])
-        ok = n // math.gcd(k, n); o2 = n // math.gcd(2 * k, n)
-        print(f"  {label:>16} | {k:>3} | {ok:>6} | {o2:>7} | "
-              f"{e_p:>10.3e} | {e_h:>10.3e} | {e_p/max(e_h,1e-12):>6.2f}")
+        ok = n // math.gcd(k, n)
+        o2 = n // math.gcd(2 * k, n)
+        print(
+            f"  {label:>16} | {k:>3} | {ok:>6} | {o2:>7} | "
+            f"{e_p:>10.3e} | {e_h:>10.3e} | {e_p / max(e_h, 1e-12):>6.2f}"
+        )
     print()
 
 
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=".", help="Where to write the FVU figure.")
     args = ap.parse_args()

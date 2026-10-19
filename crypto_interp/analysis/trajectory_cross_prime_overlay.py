@@ -18,6 +18,7 @@ Usage:
         --primes 113 127 181 \\
         --out-file outputs/theory_trajectory/cross_prime_overlay.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,8 +29,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 REGIME_ORDER = ["grokked", "algorithmic-but-noisy", "CRT-fail", "intermediate"]
-REGIME_COLOR = {"grokked": "#15803d", "algorithmic-but-noisy": "#d97706",
-                "CRT-fail": "#dc2626", "intermediate": "#6b7280"}
+REGIME_COLOR = {
+    "grokked": "#15803d",
+    "algorithmic-but-noisy": "#d97706",
+    "CRT-fail": "#dc2626",
+    "intermediate": "#6b7280",
+}
 EPS = 1e-10
 
 
@@ -59,9 +64,7 @@ def _on_grid(trajs: list[dict], key: str, grid: np.ndarray) -> np.ndarray:
     np.interp clamps at the edges, so early-stopped seeds carry their final
     (converged) value forward.
     """
-    return np.stack([
-        np.interp(grid, t["step"], np.clip(t[key], EPS, None)) for t in trajs
-    ])
+    return np.stack([np.interp(grid, t["step"], np.clip(t[key], EPS, None)) for t in trajs])
 
 
 def plot(in_dirs: list[Path], primes: list[int], out_file: Path) -> None:
@@ -79,15 +82,16 @@ def plot(in_dirs: list[Path], primes: list[int], out_file: Path) -> None:
         # the bands across 8 decades. Those regimes are row 2's story.
         ax = axes[0][j]
         finders = [t for t in trajs if float(t["L_sym"][-1]) < 1e-2]
-        for key, color, ls, label in [("L_emp", "#1d4ed8", "-", "$L_{\\rm empirical}$"),
-                                      ("L_sym", "#ea580c", "--", "$L_{\\rm symmetric}$")]:
+        for key, color, ls, label in [
+            ("L_emp", "#1d4ed8", "-", "$L_{\\rm empirical}$"),
+            ("L_sym", "#ea580c", "--", "$L_{\\rm symmetric}$"),
+        ]:
             arr = _on_grid(finders, key, grid)
             med = np.median(arr, axis=0)
             q1, q3 = np.quantile(arr, 0.25, axis=0), np.quantile(arr, 0.75, axis=0)
             ax.semilogy(grid, med, color=color, ls=ls, lw=2.0, label=label)
             ax.fill_between(grid, q1, q3, color=color, alpha=0.14, lw=0)
-        ax.set_title(f"$p = {p}$ — {len(finders)}/{n_seeds} algorithm-finding seeds",
-                     fontsize=10.5)
+        ax.set_title(f"$p = {p}$ — {len(finders)}/{n_seeds} algorithm-finding seeds", fontsize=10.5)
         ax.set_ylim(EPS, 20)
         ax.grid(True, alpha=0.25, which="both")
         ax.legend(fontsize=9, loc="upper right", framealpha=0.9)
@@ -108,13 +112,17 @@ def plot(in_dirs: list[Path], primes: list[int], out_file: Path) -> None:
             chosen.append(group[int(np.argsort(finals)[len(finals) // 2])])
         for t in chosen:
             col = REGIME_COLOR[t["regime"]]
-            ax2.semilogy(t["step"], np.clip(t["L_emp"], EPS, None),
-                         color=col, lw=1.8,
-                         label=f"seed {t['seed']} — {t['regime']}")
-            ax2.semilogy(t["step"], np.clip(t["L_sym"], EPS, None),
-                         color=col, lw=1.2, ls="--", alpha=0.8)
-        tally = ", ".join(f"{len(by_regime[r])} {r}" for r in REGIME_ORDER
-                          if r in by_regime)
+            ax2.semilogy(
+                t["step"],
+                np.clip(t["L_emp"], EPS, None),
+                color=col,
+                lw=1.8,
+                label=f"seed {t['seed']} — {t['regime']}",
+            )
+            ax2.semilogy(
+                t["step"], np.clip(t["L_sym"], EPS, None), color=col, lw=1.2, ls="--", alpha=0.8
+            )
+        tally = ", ".join(f"{len(by_regime[r])} {r}" for r in REGIME_ORDER if r in by_regime)
         ax2.set_title(f"exemplars ({tally})", fontsize=9.5)
         ax2.set_ylim(EPS, 20)
         ax2.grid(True, alpha=0.25, which="both")
@@ -123,9 +131,12 @@ def plot(in_dirs: list[Path], primes: list[int], out_file: Path) -> None:
         if j == 0:
             ax2.set_ylabel("cross-entropy (log)")
 
-    fig.suptitle("Kernel/noise decomposition across primes — median with IQR band; "
-                 "solid: actual loss ($L_{\\rm emp}$); dashed: loss of the "
-                 "symmetric kernel alone ($L_{\\rm sym}$)", fontsize=11.5)
+    fig.suptitle(
+        "Kernel/noise decomposition across primes — median with IQR band; "
+        "solid: actual loss ($L_{\\rm emp}$); dashed: loss of the "
+        "symmetric kernel alone ($L_{\\rm sym}$)",
+        fontsize=11.5,
+    )
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     out_file.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_file, dpi=140, bbox_inches="tight")

@@ -38,8 +38,8 @@ def test_reduce_to_diff_modes_agree_and_recover(p, k):
 
 def test_reduce_to_diff_shape_guards():
     with pytest.raises(ValueError):
-        reduce_to_diff(np.zeros((112, 112, 50)), 113, value_axis="full")   # wrong vocab width
+        reduce_to_diff(np.zeros((112, 112, 50)), 113, value_axis="full")  # wrong vocab width
     with pytest.raises(ValueError):
         reduce_to_diff(np.zeros((112, 112, 113)), 113, value_axis="values")  # not p-1 columns
     with pytest.raises(ValueError):
-        reduce_to_diff(np.zeros((112, 112)), 113)                          # not 3-D
+        reduce_to_diff(np.zeros((112, 112)), 113)  # not 3-D

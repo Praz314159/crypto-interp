@@ -26,15 +26,22 @@ CONFIG = ExperimentConfig(
     p=113,
     frac_train=0.3,
     seed=0,
-
-    d_model=128, d_mlp=512, num_heads=4, d_head=32, n_ctx=3, num_layers=1,
-    lr=1e-3, weight_decay=1.0, beta1=0.9, beta2=0.98, warmup_steps=10,
-
+    d_model=128,
+    d_mlp=512,
+    num_heads=4,
+    d_head=32,
+    n_ctx=3,
+    num_layers=1,
+    lr=1e-3,
+    weight_decay=1.0,
+    beta1=0.9,
+    beta2=0.98,
+    warmup_steps=10,
     num_epochs=20_000,
-
-    save_every=500, log_every=500, metrics_every=50,
+    save_every=500,
+    log_every=500,
+    metrics_every=50,
     device="auto",
-
     notes=(
         "Modular addition baseline at p=113. The Nanda task, run inside our "
         "harness so we can use the same `Session` verbs to compare against "

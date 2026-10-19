@@ -26,6 +26,7 @@ import torch
 
 # ---------- Additive Fourier basis on Z/p ----------
 
+
 def additive_fourier_basis(n: int, device: str = "cpu") -> tuple[torch.Tensor, list[str]]:
     """Returns (basis, names) where basis is an (n, n) orthonormal matrix
     on R^n indexed over Z/n.
@@ -37,7 +38,7 @@ def additive_fourier_basis(n: int, device: str = "cpu") -> tuple[torch.Tensor, l
     basis = []
     names = []
     x = torch.arange(n, device=device, dtype=torch.float64)
-    basis.append(torch.ones(n, device=device, dtype=torch.float64) / (n ** 0.5))
+    basis.append(torch.ones(n, device=device, dtype=torch.float64) / (n**0.5))
     names.append("const")
     for k in range(1, (n - 1) // 2 + 1):
         c = torch.cos(2 * torch.pi * x * k / n)
@@ -54,6 +55,7 @@ def additive_fourier_basis(n: int, device: str = "cpu") -> tuple[torch.Tensor, l
 
 
 # ---------- Multiplicative Fourier basis on (Z/p)* ----------
+
 
 def primitive_root(p: int) -> int:
     """Find the smallest primitive root g of (Z/p)*."""
@@ -91,7 +93,9 @@ def discrete_log_table(p: int) -> tuple[int, dict[int, int]]:
     return g, dlog
 
 
-def multiplicative_fourier_basis(p: int, device: str = "cpu") -> tuple[torch.Tensor, list[str], int]:
+def multiplicative_fourier_basis(
+    p: int, device: str = "cpu"
+) -> tuple[torch.Tensor, list[str], int]:
     """Build a basis for functions on Z/p indexed via the multiplicative group.
 
     The basis we return is for vectors of length p, but each basis vector is
@@ -136,6 +140,7 @@ def multiplicative_fourier_basis(p: int, device: str = "cpu") -> tuple[torch.Ten
 
 # ---------- Projection ----------
 
+
 def project_1d(tensor: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
     """Project a (p, ...) tensor onto a basis of shape (p, p), along dim 0.
 
@@ -155,11 +160,14 @@ def project_2d(
         basis_y = basis_x
     return torch.einsum(
         "kp,lq,pq...->kl...",
-        basis_x.to(tensor_pp.dtype), basis_y.to(tensor_pp.dtype), tensor_pp,
+        basis_x.to(tensor_pp.dtype),
+        basis_y.to(tensor_pp.dtype),
+        tensor_pp,
     )
 
 
 # ---------- Character indexing ----------
+
 
 @dataclass(frozen=True)
 class CharIndex:
@@ -174,10 +182,10 @@ class CharIndex:
     p: int
     g: int
     names: list[str]
-    by_char: dict[int, list[int]]   # k -> [basis row indices] (cos and sin)
-    cos: dict[int, int]             # k -> cos row index
-    sin: dict[int, int]             # k -> sin row index (absent for k = n/2)
-    freqs: list[int]                # sorted character frequencies present
+    by_char: dict[int, list[int]]  # k -> [basis row indices] (cos and sin)
+    cos: dict[int, int]  # k -> cos row index
+    sin: dict[int, int]  # k -> sin row index (absent for k = n/2)
+    freqs: list[int]  # sorted character frequencies present
 
 
 def char_index(p: int, device: str = "cpu") -> tuple[torch.Tensor, CharIndex]:
@@ -222,10 +230,14 @@ if __name__ == "__main__":
 
     print(f"Additive basis shape: {add_basis.shape}")
     add_orth = add_basis @ add_basis.T
-    print(f"  orthonormality error: {(add_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}")
+    print(
+        f"  orthonormality error: {(add_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}"
+    )
 
     print(f"\nMultiplicative basis (p={p}, primitive root g={g}):")
     print(f"  shape: {mul_basis.shape}")
     mul_orth = mul_basis @ mul_basis.T
-    print(f"  orthonormality error: {(mul_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}")
+    print(
+        f"  orthonormality error: {(mul_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}"
+    )
     print(f"  first 5 names: {mul_names[:5]}")

@@ -16,6 +16,7 @@ Usage:
     python -m crypto_interp.analysis.lattice_variation \\
         --out-dir outputs/lattice_variation/all/
 """
+
 from __future__ import annotations
 
 import argparse
@@ -56,10 +57,7 @@ def crt_check(S: Session) -> dict:
     K = sorted(int(k) for k in S.essential()["K"])
     factors = prime_factorize(S.ds.p - 1)
     orders = [S.order(k) for k in K]
-    covers = {
-        f"{q}^{e}": any(o % (q ** e) == 0 for o in orders)
-        for q, e in factors
-    }
+    covers = {f"{q}^{e}": any(o % (q**e) == 0 for o in orders) for q, e in factors}
     return {
         "K": K,
         "orders": orders,
@@ -116,8 +114,10 @@ def summarize(per_prime: dict[int, list[dict]]) -> None:
     for p, rows in per_prime.items():
         grokked = [r for r in rows if r.get("grokked")]
         loaded = [r for r in rows if "error" not in r]
-        print(f"\n--- p = {p}  (p-1 = "
-              f"{' · '.join(f'{q}^{e}' if e > 1 else str(q) for q, e in prime_factorize(p - 1))}) ---")
+        print(
+            f"\n--- p = {p}  (p-1 = "
+            f"{' · '.join(f'{q}^{e}' if e > 1 else str(q) for q, e in prime_factorize(p - 1))}) ---"
+        )
         print(f"  runs found: {len(rows)}  loaded: {len(loaded)}  grokked: {len(grokked)}")
         if not grokked:
             print("  (no grokked seeds at this prime)")
@@ -127,7 +127,9 @@ def summarize(per_prime: dict[int, list[dict]]) -> None:
         print(f"  CRT minimality:  {all_covered}/{len(grokked)} seeds cover every factor")
         # K stats
         k_sizes = [len(r["K"]) for r in grokked]
-        print(f"  |K| distribution:  min={min(k_sizes)} median={sorted(k_sizes)[len(k_sizes)//2]} max={max(k_sizes)}")
+        print(
+            f"  |K| distribution:  min={min(k_sizes)} median={sorted(k_sizes)[len(k_sizes) // 2]} max={max(k_sizes)}"
+        )
         # Helper-mult distribution
         all_mults = [m for r in grokked for m in r["helper_mults"]]
         mult_ct = Counter(all_mults)
@@ -149,38 +151,70 @@ def write_csv(per_prime: dict[int, list[dict]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["p", "run_dir", "grokked", "test_loss", "accuracy",
-                    "K", "orders", "p_minus_1_factors", "all_covered",
-                    "missing_factors", "helper_mults"])
+        w.writerow(
+            [
+                "p",
+                "run_dir",
+                "grokked",
+                "test_loss",
+                "accuracy",
+                "K",
+                "orders",
+                "p_minus_1_factors",
+                "all_covered",
+                "missing_factors",
+                "helper_mults",
+            ]
+        )
         for p, rows in per_prime.items():
             for r in rows:
                 if "error" in r:
                     w.writerow([p, r["run_dir"], "ERROR", "", "", "", "", "", "", "", r["error"]])
                     continue
                 if not r.get("grokked"):
-                    w.writerow([p, r["run_dir"], False, r.get("test_loss", ""),
-                                r.get("accuracy", ""), "", "", "", "", "", ""])
+                    w.writerow(
+                        [
+                            p,
+                            r["run_dir"],
+                            False,
+                            r.get("test_loss", ""),
+                            r.get("accuracy", ""),
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                        ]
+                    )
                     continue
                 miss = [k for k, v in r["covers"].items() if not v]
-                w.writerow([
-                    p, r["run_dir"], True, r["test_loss"], r["accuracy"],
-                    " ".join(map(str, r["K"])),
-                    " ".join(map(str, r["orders"])),
-                    " ".join(f"{q}^{e}" for q, e in r["factors"]),
-                    r["all_covered"],
-                    " ".join(miss),
-                    " ".join(map(str, r["helper_mults"])),
-                ])
+                w.writerow(
+                    [
+                        p,
+                        r["run_dir"],
+                        True,
+                        r["test_loss"],
+                        r["accuracy"],
+                        " ".join(map(str, r["K"])),
+                        " ".join(map(str, r["orders"])),
+                        " ".join(f"{q}^{e}" for q, e in r["factors"]),
+                        r["all_covered"],
+                        " ".join(miss),
+                        " ".join(map(str, r["helper_mults"])),
+                    ]
+                )
     print(f"\nWrote {path}")
 
 
 def write_plots(per_prime: dict[int, list[dict]], out_dir: Path) -> None:
     """Three figures for the paper:
-        (1) grok rate by prime
-        (2) |K| distribution per prime
-        (3) helper-multiplier histogram (the ×2 monopoly)
+    (1) grok rate by prime
+    (2) |K| distribution per prime
+    (3) helper-multiplier histogram (the ×2 monopoly)
     """
     import matplotlib.pyplot as plt  # local import: keep CSV path matplotlib-free
+
     out_dir.mkdir(parents=True, exist_ok=True)
     primes = sorted(per_prime)
 
@@ -212,9 +246,7 @@ def write_plots(per_prime: dict[int, list[dict]], out_dir: Path) -> None:
     # ----- (2) |K| distribution per prime -----
     fig, ax = plt.subplots(figsize=(5.0, 3.2))
     width = 0.8 / max(len(primes), 1)
-    all_k_sizes = [
-        len(r["K"]) for rows in per_prime.values() for r in rows if r.get("grokked")
-    ]
+    all_k_sizes = [len(r["K"]) for rows in per_prime.values() for r in rows if r.get("grokked")]
     if all_k_sizes:
         kmin, kmax = min(all_k_sizes), max(all_k_sizes)
         bins = list(range(kmin, kmax + 2))
@@ -266,16 +298,19 @@ def _p_minus_1_str(p: int) -> str:
 
 def _hist_counts(values, bins):
     import numpy as np
+
     counts, edges = np.histogram(values, bins=bins)
     return counts.tolist(), edges
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-dir", default="outputs/lattice_variation/all",
-                    help="Where to write the summary CSV + figures.")
-    ap.add_argument("--no-plots", action="store_true",
-                    help="Skip figure generation (CSV only).")
+    ap.add_argument(
+        "--out-dir",
+        default="outputs/lattice_variation/all",
+        help="Where to write the summary CSV + figures.",
+    )
+    ap.add_argument("--no-plots", action="store_true", help="Skip figure generation (CSV only).")
     args = ap.parse_args()
 
     per_prime: dict[int, list[dict]] = {}

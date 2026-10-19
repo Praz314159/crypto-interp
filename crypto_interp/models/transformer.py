@@ -102,7 +102,9 @@ class Attention(nn.Module):
         scores_pre = torch.einsum("bisd,bitd->bits", k, q)
         seq = x.shape[-2]
         scores_masked = scores_pre - 1e10 * (1 - self.mask[:seq, :seq])
-        attn = self.hook_attn(F.softmax(self.hook_attn_pre(scores_masked / np.sqrt(self.d_head)), dim=-1))
+        attn = self.hook_attn(
+            F.softmax(self.hook_attn_pre(scores_masked / np.sqrt(self.d_head)), dim=-1)
+        )
         # z[b, i, query, head_dim]
         z = self.hook_z(torch.einsum("bisd,bits->bitd", v, attn))
         z_flat = einops.rearrange(z, "b i s d -> b s (i d)")
@@ -161,8 +163,10 @@ class Transformer(nn.Module):
         self.embed = Embed(cfg.d_vocab, cfg.d_model)
         self.pos_embed = PosEmbed(cfg.n_ctx, cfg.d_model)
         self.blocks = nn.ModuleList(
-            [Block(cfg.d_model, cfg.d_mlp, cfg.d_head, cfg.num_heads, cfg.n_ctx)
-             for _ in range(cfg.num_layers)]
+            [
+                Block(cfg.d_model, cfg.d_mlp, cfg.d_head, cfg.num_heads, cfg.n_ctx)
+                for _ in range(cfg.num_layers)
+            ]
         )
         self.unembed = Unembed(cfg.d_vocab, cfg.d_model)
         for name, module in self.named_modules():

@@ -19,22 +19,27 @@ CONFIG = ExperimentConfig(
     p=113,
     frac_train=0.3,
     seed=0,
-
     # Baseline placeholder — the sweep overrides this per child.
     # Keeping it at the 001-baseline value means the un-overridden config
     # is itself a meaningful "control" run.
     d_model=128,
-
-    d_mlp=512, num_heads=4, d_head=32, n_ctx=3, num_layers=1,
-    lr=1e-3, weight_decay=1.0, beta1=0.9, beta2=0.98, warmup_steps=10,
-
+    d_mlp=512,
+    num_heads=4,
+    d_head=32,
+    n_ctx=3,
+    num_layers=1,
+    lr=1e-3,
+    weight_decay=1.0,
+    beta1=0.9,
+    beta2=0.98,
+    warmup_steps=10,
     # Long enough to either grok or land cleanly on a plateau. 20k matched
     # the d_model=12 run; we use the same budget here for direct comparability.
     num_epochs=20_000,
-
-    save_every=500, log_every=500, metrics_every=50,
+    save_every=500,
+    log_every=500,
+    metrics_every=50,
     device="auto",
-
     notes=(
         "d_model sweep. Asks two distinct questions: (a) algorithmic floor "
         "d_alg = min d_model where the model finds the mul-basis algorithm "
