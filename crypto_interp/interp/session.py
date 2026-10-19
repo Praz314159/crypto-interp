@@ -40,10 +40,12 @@ class Session:
             # The default is the multiplicative-character basis on (Z/p)*, which is
             # only the right basis for ``mul``. Analysing another task in it gives
             # plausible-looking but meaningless numbers, so refuse.
-            if self.task != "mul":
+            from ..data import MULTIPLICATIVE_TASKS
+
+            if self.task not in MULTIPLICATIVE_TASKS:
                 raise ValueError(
-                    f"Session has no default basis for task {self.task!r} (only 'mul'); "
-                    "pass basis= and ci= explicitly"
+                    f"Session has no default basis for task {self.task!r} "
+                    f"(only {sorted(MULTIPLICATIVE_TASKS)}); pass basis= and ci= explicitly"
                 )
             from .bases import char_index
 

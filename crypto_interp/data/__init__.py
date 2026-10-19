@@ -7,9 +7,13 @@ from .spec import TaskSpec
 
 _TASKS = {
     "mul": mul.build,
+    "mul_units": mul.build_units,
     "add": add.build,
     "sqrt_of_product": sqrt_mod.build,
 }
+
+#: Tasks on the multiplicative group, analysed in its character basis.
+MULTIPLICATIVE_TASKS = frozenset({"mul", "mul_units"})
 
 
 def build(task: str, **kwargs) -> Dataset:
@@ -24,6 +28,7 @@ def available_tasks() -> list[str]:
 
 __all__ = [
     "Dataset",
+    "MULTIPLICATIVE_TASKS",
     "TaskSpec",
     "build",
     "available_tasks",
