@@ -1,6 +1,6 @@
 # RunPod sweep infrastructure
 
-Run training sweeps on a rented GPU pod instead of Colab. Pods have no
+Run training sweeps on a rented GPU pod. Pods have no
 session timeout, real SSH, and a persistent filesystem for the lifetime of
 the pod — checkpoints just land on disk and get rsynced back.
 
