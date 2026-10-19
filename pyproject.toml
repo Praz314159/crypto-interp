@@ -12,15 +12,17 @@ license-files = ["LICENSE"]
 authors = [{ name = "Prashanth Ramakrishna" }]
 requires-python = ">=3.10"
 dependencies = [
-    "torch",
-    "numpy",
-    "einops",
-    "matplotlib",
-    "jaxtyping",
+    "torch>=2.2",
+    "numpy>=1.26",
+    "einops>=0.7",
+    "matplotlib>=3.8",
+    "jaxtyping>=0.2.25",
+    "pandas>=2.1",
+    "pyarrow>=14",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest>=8", "ruff>=0.14"]
 
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
