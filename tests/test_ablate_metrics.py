@@ -1,10 +1,12 @@
 import numpy as np
+import pytest
 import torch
 
 from crypto_interp.interp import (
     ablate_character,
     char_energy,
     char_index,
+    correlate,
     per_frequency_energy_from_embedding,
     project_back,
 )
@@ -42,3 +44,11 @@ def test_char_energy_matches_per_frequency_list():
     ce = char_energy(W, basis, ci)
     ref = np.array(per_frequency_energy_from_embedding(W, basis, p))
     assert np.allclose(ce[: len(ref)], ref, atol=1e-9)
+
+
+def test_correlate_rejects_mismatched_inputs():
+    with pytest.raises(ValueError, match="None"):
+        correlate(None, np.ones((4, 4)))
+    with pytest.raises(ValueError, match="matching shapes"):
+        correlate(np.ones((3, 3)), np.ones((4, 4)))
+    assert correlate(np.arange(6.0), 2 * np.arange(6.0)) == pytest.approx(1.0)

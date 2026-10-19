@@ -132,9 +132,15 @@ def order_of(k: int, p: int) -> int:
 
 
 def correlate(x, y) -> float:
-    """Mean-centered cosine similarity (Pearson correlation) of two arrays."""
-    x = np.asarray(x, dtype=np.float64).ravel()
-    y = np.asarray(y, dtype=np.float64).ravel()
+    """Mean-centered cosine similarity (Pearson correlation) of two same-shape arrays."""
+    if x is None or y is None:
+        raise ValueError("correlate got None (e.g. Session.cluster_signal for a character with no neurons)")
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    if x.shape != y.shape:
+        raise ValueError(f"correlate needs matching shapes, got {x.shape} and {y.shape}")
+    x = x.ravel()
+    y = y.ravel()
     x = x - x.mean()
     y = y - y.mean()
     return float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y) + 1e-12))
