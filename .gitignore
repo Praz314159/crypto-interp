@@ -23,7 +23,6 @@ notes/
 # Research artifacts — hypotheses, findings, agenda; disk-only
 research_directions.md
 experiments/*/README.md
-experiments/*/scripts/README.md
 
 # Experiment outputs — regenerable, can be large
 experiments/*/runs/
@@ -34,9 +33,6 @@ experiments/*/data/
 # Analysis outputs — regenerable figures/CSVs/npz, organized as
 # outputs/<analysis>/<experiment-id-or-"all">/
 outputs/
-
-# Drive-imported sweep archives — large, regeneratable on Colab
-imported_data/
 
 # Background-task / debug logs
 *.log
