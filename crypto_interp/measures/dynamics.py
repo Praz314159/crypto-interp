@@ -49,6 +49,8 @@ def grok_status(run, mem_thresh: float = 0.1, grok_thresh: float = 0.1) -> GrokS
     from ..interp.dynamics import grokking_status
 
     train, test = _loss_history(run)
+    if len(train) == 0 or len(test) == 0:
+        raise ValueError(f"{run.id} has no loss history")
     st = grokking_status(train, test, mem_thresh=mem_thresh, grok_thresh=grok_thresh)
     if st["grokked"]:
         status = "grokked"
