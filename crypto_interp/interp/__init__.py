@@ -1,7 +1,6 @@
 """Mechanistic interpretability primitives for grokked modular-arithmetic models.
 
-Reusable building blocks only — experiment-specific analysis scripts live in
-``experiments/<id>/scripts/`` and import from here.
+Reusable building blocks; named analyses are in :mod:`crypto_interp.measures`.
 """
 
 from .ablate import (

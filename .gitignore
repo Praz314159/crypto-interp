@@ -23,7 +23,6 @@ notes/
 # Research artifacts — hypotheses, findings, agenda; disk-only
 research_directions.md
 experiments/*/README.md
-experiments/*/scripts/README.md
 
 # Experiment outputs — regenerable, can be large
 experiments/*/runs/
