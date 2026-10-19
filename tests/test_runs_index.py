@@ -81,3 +81,10 @@ def test_old_manifest_is_read_through(tmp_path):
     (run_dir / "manifest.json").write_text(json.dumps({"backfilled": True, "config": {"seed": 99}}))
     assert runs.Run.open(run_dir).task.seed == 0
 
+
+def test_cli_ls(root, capsys):
+    from crypto_interp.runs.__main__ import main
+
+    main(["ls", "--root", str(root), "--experiment", "001"])
+    out = capsys.readouterr().out
+    assert "001_toy/a_seed1" in out and "2 runs" in out
