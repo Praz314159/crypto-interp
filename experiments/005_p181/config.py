@@ -15,8 +15,9 @@ are still labeled correctly.
 Run a clean, correctly-tagged sweep with the driver:
     python experiments/003_dmodel_sweep_p113/scripts/run_dmlp_seed_sweep.py \
         --experiment 005_p181 --d-mlps 32 --seeds 1,2,3 --epochs 50000
-Analyze:
-    python -m crypto_interp.analysis.delta_spectrum --run-dir experiments/005_p181/runs/<run>
+Analyze the runs with the measures, e.g. the primary/helper split:
+    from crypto_interp import measures, runs
+    measures.helpers.over(runs.query(experiment="005"))
 """
 
 from crypto_interp.training import ExperimentConfig

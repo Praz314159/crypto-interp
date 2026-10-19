@@ -93,3 +93,25 @@ def test_noise_figures_render():
     fig = nfig.population(pd.DataFrame(rows))
     assert fig.axes
     matplotlib.pyplot.close(fig)
+
+
+def test_character_figures_render(S):
+    from crypto_interp.figures import characters as chfig
+    from crypto_interp.measures import (
+        char_ablation,
+        energy_support,
+        fourier2d,
+        helpers,
+        neuron_clusters,
+    )
+
+    h, nc = helpers(S), neuron_clusters(S)
+    for fig in (
+        chfig.ablation(char_ablation(S), energy_support(S), "ref"),
+        chfig.delta_spectrum(h),
+        chfig.delta(h, 10, S.ds.p),
+        chfig.cluster(nc, 10, S.ds.p),
+        chfig.fourier2d(fourier2d(S)),
+    ):
+        assert fig.axes
+        matplotlib.pyplot.close(fig)

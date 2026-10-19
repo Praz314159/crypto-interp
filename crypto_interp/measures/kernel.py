@@ -36,6 +36,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
+from .characters import support
 from .core import measure
 
 #: Loss below which a model (L_emp) or its kernel (L_sym) counts as solved.
@@ -163,7 +164,7 @@ def classify_regime(K: Iterable[int], p: int, L_emp: float, L_sym: float) -> str
 
 @dataclass
 class KernelNoise:
-    K: tuple[int, ...]  # support used (default: ablation-essential characters)
+    K: tuple[int, ...]  # support used (default: the energy support)
     L_emp: float  # model loss on the units grid
     L_sym: float  # loss of the observed kernel κ_obs
     L_K: float  # loss of κ_obs truncated to K
@@ -180,12 +181,12 @@ class KernelNoise:
 def kernel_noise(S, K: Iterable[int] | None = None) -> KernelNoise:
     """Kernel/noise decomposition and regime of the model in Session ``S``.
 
-    ``K`` defaults to the ablation-essential characters, ``S.essential()["K"]``.
+    ``K`` defaults to the energy support, :func:`.characters.energy_support`.
     """
     from ..interp.bases import discrete_log_table
 
     p = S.ds.p
-    K = tuple(sorted(int(k) for k in (S.essential()["K"] if K is None else K)))
+    K = support(S, K)
     _, dlog = discrete_log_table(p)
     logits = S.logits_grid.detach().cpu()
     if isinstance(logits, torch.Tensor):

@@ -11,10 +11,9 @@ helper pairs are directly comparable.
 run_dmlp_seed_sweep.py overrides d_mlp and seed per child run:
     python experiments/003_dmodel_sweep_p113/scripts/run_dmlp_seed_sweep.py \
         --experiment 004_p127 --d-mlps 32,128 --seeds 1,2,3 --epochs 40000
-Analyze any resulting run with the canonical library analyses, e.g.:
-    python -m crypto_interp.analysis.delta_spectrum --run-dir experiments/004_p127/runs/<run>
-    # if collected:
-    python -m crypto_interp.analysis.bifurcation --data-dir experiments/004_p127/data
+Analyze the runs with the measures, e.g. the primary/helper split:
+    from crypto_interp import measures, runs
+    measures.helpers.over(runs.query(experiment="004"))
 """
 
 from crypto_interp.training import ExperimentConfig
