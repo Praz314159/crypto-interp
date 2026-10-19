@@ -48,3 +48,13 @@ def test_all_kernel_figures_render(traj):
     ):
         assert fig.axes
         matplotlib.pyplot.close(fig)
+
+
+def test_error_figures_render(S):
+    from crypto_interp.figures import errors as efig
+    from crypto_interp.measures import errors
+
+    e = errors(S)
+    for fig in (efig.profile(e, "ref"), efig.population({"ref": e}, {"ref": "grokked"})):
+        assert fig.axes
+        matplotlib.pyplot.close(fig)

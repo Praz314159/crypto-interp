@@ -13,6 +13,16 @@ See :mod:`crypto_interp.measures.core` for the framework.
 """
 
 from .core import REGISTRY, Measure, measure
+from .errors import ErrorProfile, errors
 from .kernel import REGIMES, KernelNoise, kernel_noise
 
-__all__ = ["REGIMES", "REGISTRY", "KernelNoise", "Measure", "kernel_noise", "measure"]
+__all__ = [
+    "REGIMES",
+    "REGISTRY",
+    "ErrorProfile",
+    "KernelNoise",
+    "Measure",
+    "errors",
+    "kernel_noise",
+    "measure",
+]
