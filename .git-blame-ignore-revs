@@ -1,3 +1,5 @@
 # Bulk formatting commits, skipped by `git blame` (git config blame.ignoreRevsFile .git-blame-ignore-revs).
 # Apply ruff format
 c2bd8d78e8625dfd24f66e40f97632efc0ede1cf
+# Format Python code blocks in Markdown (ruff 0.17)
+e26082ac20cfcd10f0769f9505d9e0bc5f3e72c7
