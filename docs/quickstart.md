@@ -29,8 +29,8 @@ crypto-interp measure kernel_noise --run tests/fixtures/mul_p113_d24_m32_seed1
 ```
 
 ```text
-                         run               K    L_emp        L_sym          L_K  kernel_margin  crt_gcd  crt_floor  regime
-tests/mul_p113_d24_m32_seed1 (3, 10, 20, 51) 0.000125 2.264117e-08 2.669832e-08      18.524425        1        0.0 grokked
+                         run               K    L_emp        L_sym  L_emp_test   L_sym_test          L_K  kernel_margin  crt_gcd  crt_floor  regime
+tests/mul_p113_d24_m32_seed1 (3, 10, 20, 51) 0.000125 2.264117e-08    0.000179 2.432381e-08 2.669832e-08      18.524425        1        0.0 grokked
 ```
 
 How to read it:
@@ -41,11 +41,10 @@ How to read it:
   "clock" per k.
 - **L_emp** is the model's actual cross-entropy over all (a, b), while
   **L_sym** is the loss of its symmetric part alone: the logit as a function
-  of how far the candidate is from the answer, in discrete-log steps. For a
-  model that generalizes, a tiny L_sym means the algorithm is exact, and the
-  gap L_emp − L_sym is noise on top of it. (Both are computed over all pairs,
-  training pairs included, so a model that only memorized can also score a
-  low L_sym; check `grok_status` too.)
+  of how far the candidate is from the answer, in discrete-log steps. A tiny
+  L_sym means the algorithm is exact, and the gap L_emp − L_sym is noise on
+  top of it. The `_test` versions use only the pairs held out from training,
+  which memorization cannot help with.
 - **crt_gcd** = gcd(K ∪ {112}). When it is 1, the characters in K jointly
   separate every element of (ℤ/113)*, so the answer is pinned down uniquely
   (the CRT step). When it is g > 1, no model using only K can do better than
