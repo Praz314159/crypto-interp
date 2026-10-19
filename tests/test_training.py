@@ -1,3 +1,5 @@
+import torch
+
 from crypto_interp.runs import checkpoint_paths, load_checkpoint
 from crypto_interp.training import ExperimentConfig, resume, train
 
@@ -17,7 +19,7 @@ def _cfg(**kw):
     )
 
 
-def test_train_and_resume_write_schema_2(tmp_path):
+def test_train_writes_schema_2_and_resume_continues_exactly(tmp_path):
     run = tmp_path / "run"
     train(_cfg(), run, tmp_path / "datasets")
 
@@ -28,5 +30,12 @@ def test_train_and_resume_write_schema_2(tmp_path):
 
     resume(_cfg(), ckpts[-1], additional_epochs=5, datasets_dir=tmp_path / "datasets")
     resumed = load_checkpoint(checkpoint_paths(run)[-1])
-    assert resumed.source_schema == 2
-    assert (resumed.epoch, len(resumed.train_losses)) == (24, 25)
+
+    straight = tmp_path / "straight"
+    train(_cfg(num_epochs=25), straight, tmp_path / "datasets")
+    reference = load_checkpoint(checkpoint_paths(straight)[-1])
+
+    assert resumed.epoch == reference.epoch == 24
+    assert resumed.train_losses == reference.train_losses
+    for k, v in reference.model_state.items():
+        assert torch.equal(resumed.model_state[k], v), k

@@ -345,6 +345,11 @@ def resume(
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda s: min(s / warmup, 1.0))
     if rckpt.scheduler_state is not None:
         scheduler.load_state_dict(rckpt.scheduler_state)
+        # Constructing LambdaLR set every group's lr to base_lr * lambda(0) = 0, and
+        # load_state_dict restores the step count but not the lr. Put it back, or the
+        # first resumed step runs at lr 0.
+        for group, lr in zip(optimizer.param_groups, scheduler.get_last_lr(), strict=True):
+            group["lr"] = lr
     else:
         for _ in range(rckpt.epoch + 1):
             scheduler.step()
