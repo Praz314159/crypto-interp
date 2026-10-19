@@ -44,7 +44,9 @@ base_test = S.evaluate()[1]
 for k in S.essential()["K"]:
     with ablate_char_w(S.model, k, S.basis, S.ci):
         ablated_test = evaluate_loss(S.model, S.ds)[1]
-    print(f"χ{k}: test {base_test:.1e} → {ablated_test:.1e}  (Δlog10 {math.log10(ablated_test/base_test):+.2f})")
+    print(
+        f"χ{k}: test {base_test:.1e} → {ablated_test:.1e}  (Δlog10 {math.log10(ablated_test / base_test):+.2f})"
+    )
 ```
 
 ## Recipe — activation-space: where does the signal live?

@@ -41,7 +41,7 @@ from crypto_interp.interp import Session
 
 S = Session.from_run("experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1")
 K = S.essential()["K"]
-pairs = S.helpers(K)               # [(helper, primary, mult, energy), ...]
+pairs = S.helpers(K)  # [(helper, primary, mult, energy), ...]
 sizes = S.cluster_sizes(K)
 
 print(f"K = {K}   orders = {[S.order(k) for k in K]}")
@@ -66,9 +66,12 @@ from collections import Counter
 
 rows = []
 for d in sorted(glob.glob("experiments/003_dmodel_sweep_p113/runs/dmodel_24*")):
-    try: S = Session.from_run(d)
-    except Exception: continue
-    if S.evaluate()[1] > 1e-3: continue       # grokked only
+    try:
+        S = Session.from_run(d)
+    except Exception:
+        continue
+    if S.evaluate()[1] > 1e-3:
+        continue  # grokked only
     K = S.essential()["K"]
     helpers = {h for (h, *_) in S.helpers(K)}
     prims = [k for k in K if k not in helpers]

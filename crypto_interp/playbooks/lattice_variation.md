@@ -44,16 +44,21 @@ The recipe is "the standard playbooks, applied at each prime." Concretely:
 import math
 from crypto_interp.interp import Session
 
+
 def prime_factorize(n):
     out, d = [], 2
     while d * d <= n:
         e = 0
         while n % d == 0:
-            n //= d; e += 1
-        if e: out.append((d, e))
+            n //= d
+            e += 1
+        if e:
+            out.append((d, e))
         d += 1
-    if n > 1: out.append((n, 1))
+    if n > 1:
+        out.append((n, 1))
     return out
+
 
 def crt_minimality_check(S):
     """For each grokked seed, check whether K covers each prime-power factor of p-1."""
@@ -61,24 +66,36 @@ def crt_minimality_check(S):
     factors = prime_factorize(S.ds.p - 1)
     orders = [S.order(k) for k in K]
     covers = {f"{q}^{e}": any(o % (q**e) == 0 for o in orders) for q, e in factors}
-    return {"K": K, "orders": orders, "factors": factors, "covers": covers,
-            "all_covered": all(covers.values())}
+    return {
+        "K": K,
+        "orders": orders,
+        "factors": factors,
+        "covers": covers,
+        "all_covered": all(covers.values()),
+    }
+
 
 # After training: per-prime population
 results = {}
 for p in [47, 113, 127, 181, 193, 211]:
     seed_results = []
-    for d in sorted(glob.glob(f"experiments/00X_p{p}/runs/*")):     # adjust path
-        try: S = Session.from_run(d)
-        except Exception: continue
-        if S.evaluate()[1] > 1e-3: continue
+    for d in sorted(glob.glob(f"experiments/00X_p{p}/runs/*")):  # adjust path
+        try:
+            S = Session.from_run(d)
+        except Exception:
+            continue
+        if S.evaluate()[1] > 1e-3:
+            continue
         chk = crt_minimality_check(S)
         helpers = S.helpers(chk["K"])
-        seed_results.append({
-            "K": chk["K"], "orders": chk["orders"],
-            "all_covered": chk["all_covered"],
-            "helper_mults": [m for (_h, _m, m, _e) in helpers if m],
-        })
+        seed_results.append(
+            {
+                "K": chk["K"],
+                "orders": chk["orders"],
+                "all_covered": chk["all_covered"],
+                "helper_mults": [m for (_h, _m, m, _e) in helpers if m],
+            }
+        )
     results[p] = seed_results
 ```
 

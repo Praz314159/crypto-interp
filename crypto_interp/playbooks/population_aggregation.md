@@ -32,15 +32,18 @@ from collections import Counter
 import numpy as np
 from crypto_interp.interp import Session
 
-rows = []          # one per (seed, primary): (seed, k, order, neurons)
+rows = []  # one per (seed, primary): (seed, k, order, neurons)
 helper_mults = []  # all detected helper multipliers
-prim_counts = []   # one per seed: number of primaries
+prim_counts = []  # one per seed: number of primaries
 
 for d in sorted(glob.glob("experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed*")):
     seed = int(d.split("seed")[-1])
-    try: S = Session.from_run(d)
-    except Exception: continue
-    if S.evaluate()[1] > 1e-3: continue                  # grokked only
+    try:
+        S = Session.from_run(d)
+    except Exception:
+        continue
+    if S.evaluate()[1] > 1e-3:
+        continue  # grokked only
 
     K = S.essential()["K"]
     helpers = {h: (m, mult) for (h, m, mult, _e) in S.helpers(K)}
@@ -54,8 +57,10 @@ for d in sorted(glob.glob("experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp
 
 print(f"#primaries distribution: {dict(Counter(prim_counts))}")
 print(f"helper multipliers: {dict(Counter(helper_mults))}")
-print(f"primary cluster sizes (mean ± std): "
-      f"{np.mean([r[3] for r in rows]):.1f} ± {np.std([r[3] for r in rows]):.1f}")
+print(
+    f"primary cluster sizes (mean ± std): "
+    f"{np.mean([r[3] for r in rows]):.1f} ± {np.std([r[3] for r in rows]):.1f}"
+)
 ```
 
 Output: the distribution of #primaries across grokked seeds, a histogram of
