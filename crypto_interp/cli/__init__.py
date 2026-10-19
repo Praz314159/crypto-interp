@@ -136,6 +136,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_selection_args(f)
     f.add_argument("--out", type=Path)
     f.add_argument("--k", type=int, help="character, for single-character figures")
+    f.add_argument("--a", type=int, help="first input, for the walkthrough")
+    f.add_argument("--b", type=int, help="second input, for the walkthrough")
     f.add_argument("--title")
     f.add_argument("--dpi", type=int, default=130)
     f.set_defaults(func=_figure_main)

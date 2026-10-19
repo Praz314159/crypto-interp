@@ -21,6 +21,7 @@ ALLOWED = {
     "measures": {"interp", "runs", "models", "data", "reference"},
     "figures": {"measures"},
     "theory": set(),
+    "viz": {"interp", "measures", "runs", "models", "data"},
 }
 
 

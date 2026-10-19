@@ -17,16 +17,10 @@ character basis, where each stage of the algorithm is geometric:
       is individually ambiguous (coset-periodic); their sum spikes at the
       answer.  Model logits overlaid in gray.
 
-Usage:
-    python -m crypto_interp.analysis.inference_viewer \\
-        --run-dir experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1 \\
-        --a 7 --b 12
+    crypto-interp figure walkthrough --run <run dir> --a 7 --b 12 --out walkthrough.png
 """
 
 from __future__ import annotations
-
-import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -208,35 +202,3 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     fig.suptitle(f"{a} × {b} ≡ {ans}  (mod {p})", fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--run-dir", required=True)
-    ap.add_argument("--a", type=int, required=True)
-    ap.add_argument("--b", type=int, required=True)
-    ap.add_argument(
-        "--ks",
-        type=int,
-        nargs="*",
-        default=None,
-        help="Character set override (default: essential K).",
-    )
-    ap.add_argument("--out-file", default=None)
-    args = ap.parse_args()
-
-    S = Session.from_run(args.run_dir)
-    fig = make_figure(S, args.a, args.b, K=args.ks)
-
-    out = args.out_file
-    if out is None:
-        run = Path(args.run_dir)
-        exp = run.parent.parent.name
-        out = Path("outputs/inference_viewer") / exp / f"{run.name}_a{args.a}_b{args.b}.png"
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=130)
-    print(f"Wrote {out}")
-
-
-if __name__ == "__main__":
-    main()
