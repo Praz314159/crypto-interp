@@ -72,3 +72,24 @@ def test_clock_figures_render():
     fig = cfig.residual_vs_error(tokens)
     assert fig.axes
     matplotlib.pyplot.close(fig)
+
+
+def test_noise_figures_render():
+    from crypto_interp.figures import noise as nfig
+    from crypto_interp.measures import NOISE_CLASSES
+
+    rows = [
+        {
+            "seed": s,
+            "regime": REGIMES[s],
+            "L_emp": 1e-3 * (s + 1),
+            "L_sym": 1e-4,
+            "noise_at_target_var": 1e-3 * (s + 1),
+            "total_power": 10.0,
+            **{c: 10.0 / len(NOISE_CLASSES) for c in NOISE_CLASSES},
+        }
+        for s in range(4)
+    ]
+    fig = nfig.population(pd.DataFrame(rows))
+    assert fig.axes
+    matplotlib.pyplot.close(fig)
