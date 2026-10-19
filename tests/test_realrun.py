@@ -1,5 +1,5 @@
-"""Real-run regression tests against the documented harmonic-helper findings.
-Skipped automatically (via the loaded_run fixture) if the run dir is absent."""
+"""Regression tests against the documented harmonic-helper findings (note 06),
+on the committed reference model."""
 import torch
 
 from crypto_interp.interp import (

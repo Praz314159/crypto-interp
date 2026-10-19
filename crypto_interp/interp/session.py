@@ -16,18 +16,12 @@ Construction::
     S = Session.from_run("experiments/003/.../seed1")
     K = S.essential()["K"]
     helpers = S.helpers(K)
-    f_diff, spectrum, dom = S.delta_k_spectrum(33)
+    f_diff, spectrum, dom = S.delta_k_spectrum(10)
     sizes = S.cluster_sizes(K)
 
-Example (runnable on the seed-1 fixture)::
-
-    >>> from crypto_interp.interp import Session
-    >>> S = Session.from_run(
-    ...     "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1")
-    >>> sorted(S.essential()["K"])
-    [8, 10, 33, 46, 52]
-    >>> [(h, m, mult) for (h, m, mult, _e) in S.helpers([8, 10, 33, 46, 52])]
-    [(8, 52, 2), (46, 33, 2)]
+On the reference model in ``tests/fixtures`` (checked by
+``tests/test_harness_smoke.py``), ``K == [3, 10, 20, 51]`` and the only helper
+is ``(20, 10, 2)``: χ_20 doubles χ_10.
 """
 
 from __future__ import annotations

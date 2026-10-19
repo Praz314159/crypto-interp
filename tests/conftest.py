@@ -2,21 +2,28 @@ from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-RUN_DIR = REPO / "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_32_seed1"
-HAS_RUN = RUN_DIR.exists() and any(RUN_DIR.glob("checkpoint_*.pt"))
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+# The reference grokked model (p=113, d_model=24, d_mlp=32, seed 1): the run
+# documented in note 06. Committed as a weights-only checkpoint; its dataset is
+# rebuilt deterministically from the config.
+REFERENCE_CKPT = FIXTURES / "mul_p113_d24_m32_seed1" / "checkpoint_009999.pt"
 
 
 @pytest.fixture(scope="session")
-def loaded_run():
-    """The reference grokked model (p=113, d_model=24, d_mlp=32, seed 1).
-    Skips if the (gitignored) run dir is absent."""
-    if not HAS_RUN:
-        pytest.skip("reference run dmodel_24_dmlp_32_seed1 not present")
+def loaded_run(tmp_path_factory):
+    """``(model, ds, basis, ci)`` for the reference model."""
     from crypto_interp.interp import char_index, load_run
 
-    ck = sorted(RUN_DIR.glob("checkpoint_*.pt"))[-1]
-    model, ds, _ = load_run(ck)
+    model, ds, _ = load_run(REFERENCE_CKPT, datasets_dir=tmp_path_factory.mktemp("datasets"))
     model.eval()
     basis, ci = char_index(ds.p)
     return model, ds, basis, ci
+
+
+@pytest.fixture(scope="session")
+def S(loaded_run):
+    """A :class:`Session` on the reference model."""
+    from crypto_interp.interp import Session
+
+    model, ds, basis, ci = loaded_run
+    return Session(model, ds, basis=basis, ci=ci)

@@ -1,70 +1,49 @@
-"""Harness v1 smoke test — Session + cost-atom playbook recipe on the
-reference run, plus an end-to-end activation-patching check.
+"""Smoke tests for Session and the intervention verbs on the reference model.
 
-Mirrors the playbooks (``basis_discovery.md``, ``economy_analysis.md``,
-``causal_intervention.md``) so that if these tests break, the playbooks are
-also out of date. Skipped automatically if the reference run isn't present.
+The reference model (``conftest.REFERENCE_CKPT``) grokked with
+K = {3, 10, 20, 51}: three primaries plus χ_20, a doubling helper of χ_10.
 """
-from pathlib import Path
-
-import pytest
 import torch
-import torch.nn.functional as F
 
 from crypto_interp.interp import (
-    Session,
     ablate_char_w,
-    act_patch,
     correlate,
     patch_mlp_out,
     weight_patch,
 )
 
-REPO = Path(__file__).resolve().parents[1]
-SEED1 = REPO / "experiments/003_dmodel_sweep_p113/runs/dmodel_24_dmlp_20_wd2_seed1"
 
-
-@pytest.fixture(scope="module")
-def S():
-    if not (SEED1.exists() and any(SEED1.glob("checkpoint_*.pt"))):
-        pytest.skip("reference run dmodel_24_dmlp_20_wd2_seed1 not present")
-    return Session.from_run(SEED1)
-
-
-def test_cost_atom_playbook(S):
-    """The cost-atom recipe from playbooks/economy_analysis.md."""
+def test_cost_atom(S):
+    """Essential set, the doubling helper, and per-primary neuron budgets."""
     ess = S.essential(threshold=0.05)
-    assert sorted(ess["K"]) == [8, 10, 33, 46, 52]
+    assert sorted(ess["K"]) == [3, 10, 20, 51]
 
-    pairs = S.helpers(ess["K"])
-    triples = sorted((h, m, mult) for (h, m, mult, _e) in pairs)
-    # Doubling-economy: ×2 helpers only; χ_8 = 2·χ_52, χ_46 = 2·χ_33.
-    assert triples == [(8, 52, 2), (46, 33, 2)]
+    triples = sorted((h, m, mult) for (h, m, mult, _e) in S.helpers(ess["K"]))
+    assert triples == [(20, 10, 2)]
 
-    sizes = S.cluster_sizes(ess["K"])
-    # Helpers cost 0 dedicated neurons; primaries 6-8.
-    assert sizes[8] == 0 and sizes[46] == 0
-    assert sizes[10] == 8 and sizes[33] == 6 and sizes[52] == 6
+    # The helper costs no dedicated neurons; the primaries share the other 32.
+    assert S.cluster_sizes(ess["K"]) == {3: 11, 10: 13, 20: 0, 51: 8}
 
 
-def test_mechanism_verification_playbook(S):
-    """Mechanism-verification: the primary χ_10 cluster's signal correlates
-    > 0.94 with the algebraic reference cos(θ_10(a) + θ_10(b))."""
-    sig = S.cluster_signal(10)
-    ref = S.reference_signal(10)
-    corr = correlate(sig, ref)
-    assert corr > 0.94, f"χ_10 cluster vs reference correlation {corr:.3f} too low"
+def test_mechanism_verification(S):
+    """Each primary's neuron cluster reproduces cos(θ_k(a) + θ_k(b))."""
+    for k, floor in [(3, 0.97), (10, 0.95)]:
+        corr = correlate(S.cluster_signal(k), S.reference_signal(k))
+        assert corr > floor, f"χ_{k} cluster vs reference correlation {corr:.3f} too low"
+    # A helper has no cluster of its own.
+    assert S.cluster_signal(20) is None
 
 
-def test_causal_intervention_playbook(S):
-    """Activation-patching recipe: mlp_out at position 2 (= token) fully
-    recovers when χ_10 is ablated from W_E."""
+def test_causal_intervention(S):
+    """Ablating χ_10 from W_E breaks the model; patching clean mlp_out back in
+    at the '=' position fully recovers it, and patching at a or b does not."""
     _, clean_cache = S.run_with_cache(S.ds.inputs)
     with ablate_char_w(S.model, k=10, basis=S.basis, ci=S.ci):
+        _, te, _ = S.evaluate()
+        assert te > 10.0
         per_pos = patch_mlp_out(S.model, S.ds.inputs, clean_cache, S.test_loss_metric)
-    # Position 2 (the '=' token) carries the answer-position information; 0 and 1 do not.
     assert float(per_pos[2]) < 1e-3, f"pos-2 patch failed to recover: {per_pos[2]}"
-    assert float(per_pos[0]) > 1.0, f"pos-0 patch unexpectedly recovered: {per_pos[0]}"
+    assert float(per_pos[0]) > 10.0 and float(per_pos[1]) > 10.0
 
 
 def test_weight_patch_restores(S):
