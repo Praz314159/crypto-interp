@@ -66,7 +66,8 @@ def test_sweep_then_measure_and_figure(root, tmp_path, capsys):
     main(["figure", "regimes", "--root", str(root), "--experiment", "001", "--out", str(png)])
     assert png.stat().st_size > 0
 
-    sel = ["--select", "d_mlp=8 seed=1", "--select", "d_mlp=16 seed=2"]
+    # "001" must stay a directory prefix, not become the number 1
+    sel = ["--select", "experiment=001 d_mlp=8 seed=1", "--select", "d_mlp=16 seed=2"]
     main(["measure", "grok_status", "--root", str(root), *sel, "--out", str(out)])
     rows = pd.read_csv(out)[["d_mlp", "seed"]].itertuples(index=False)
     assert {tuple(r) for r in rows} == {(8, 1), (16, 2)}

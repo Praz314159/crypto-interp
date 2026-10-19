@@ -67,7 +67,7 @@ def _query(args, fields: dict) -> RunSet:
     experiment = fields.pop("experiment", None)
     return query(
         args.root,
-        experiment=None if experiment is None else str(experiment),
+        experiment=experiment,
         include_excluded=args.all,
         **fields,
     )
@@ -79,7 +79,12 @@ def select(args) -> RunSet:
     if args.select:
         found = {}
         for q in args.select:
-            for run in _query(args, parse_assignments(q.split())):
+            fields = parse_assignments([kv for kv in q.split() if not kv.startswith("experiment=")])
+            # The experiment is a directory prefix ("003"), never a number.
+            fields["experiment"] = next(
+                (kv.split("=", 1)[1] for kv in q.split() if kv.startswith("experiment=")), None
+            )
+            for run in _query(args, fields):
                 found[run.id] = run
         return RunSet(list(found.values()))
     return _query(args, {"experiment": args.experiment, **parse_assignments(args.where)})
