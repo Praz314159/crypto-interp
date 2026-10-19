@@ -1,5 +1,6 @@
 """Load a trained checkpoint into a (model, dataset, ckpt) triple."""
 
+import dataclasses
 from pathlib import Path
 
 import torch
@@ -46,13 +47,11 @@ def load_run(
         frac_train=cfg_dict["frac_train"],
         seed=cfg_dict["seed"],
     )
-    cfg = TransformerConfig(
-        d_vocab=ds.vocab_size,
-        d_model=cfg_dict["d_model"],
-        d_mlp=cfg_dict["d_mlp"],
-        num_heads=cfg_dict["num_heads"],
-        d_head=cfg_dict["d_head"],
-    )
+    # Every architecture field the checkpoint records (n_ctx, num_layers, ...);
+    # fields it predates fall back to the TransformerConfig defaults.
+    arch = {f.name: cfg_dict[f.name] for f in dataclasses.fields(TransformerConfig)
+            if f.name != "d_vocab" and f.name in cfg_dict}
+    cfg = TransformerConfig(d_vocab=ds.vocab_size, **arch)
     model = Transformer(cfg).to(device)
     model.load_state_dict(ckpt["model_state"])
     model.eval()
