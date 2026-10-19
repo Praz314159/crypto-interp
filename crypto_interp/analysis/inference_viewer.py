@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from crypto_interp import measures
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
 
@@ -81,8 +82,9 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     if a % p == 0 or b % p == 0:
         raise ValueError("a and b must be nonzero mod p (dlog undefined at 0)")
     if K is None:
-        K = sorted(S.essential()["K"])
-    helpers = {h: m for (h, m, _mult, _e) in S.helpers(K)}
+        K = list(measures.energy_support(S).K)
+    h = measures.helpers(S, K=K)
+    helpers = dict(zip(h.helpers, h.helper_of, strict=True))
     _, dom = S.per_neuron_dominant_char()
 
     theta = lambda k, x: 2 * np.pi * k * dlog[x % p] / n  # noqa: E731

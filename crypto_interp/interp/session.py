@@ -1,34 +1,28 @@
-"""Session — the analysis bundle.
+"""Session: one model, its dataset and its character basis, with shared forward passes.
 
-A :class:`Session` packages ``(model, ds, task, basis, ci)`` together so that
-analyses are method calls rather than 4-argument function calls. It does not
-add new logic; every method dispatches to an existing canonical function in
-``crypto_interp.interp`` (or ``crypto_interp.analysis``).
+A :class:`Session` is the context a measure runs in (see
+:mod:`crypto_interp.measures`). It holds ``(model, ds, task, basis, ci)`` and
+the primitive accessors measures share; the analyses themselves live in
+measures.
 
-Two lazy properties are built on first access and reused, so an analysis that
-runs several queries against the same forward pass pays the forward cost once:
-``cache`` (an :class:`ActivationCache` over the full p² grid; ``cache.grid(name,
-units=True)`` gives its units view) and ``logits_grid`` (logits over the
-(p-1)² units grid). See :mod:`crypto_interp.interp.grids` for the two grids.
+Two lazy properties are built on first access and reused, so several queries
+against the same forward pass pay for it once: ``cache`` (an
+:class:`ActivationCache` over the full p² grid; ``cache.grid(name,
+units=True)`` gives its units view) and ``logits_grid`` (logits over the (p-1)²
+units grid). See :mod:`crypto_interp.interp.grids` for the two grids.
 
-Construction::
+::
 
     from crypto_interp.interp import Session
-    S = Session.from_run("experiments/003/.../seed1")
-    K = S.essential()["K"]
-    helpers = S.helpers(K)
-    f_diff, spectrum, dom = S.delta_k_spectrum(10)
-    sizes = S.cluster_sizes(K)
+    from crypto_interp import measures
 
-On the reference model in ``tests/fixtures`` (checked by
-``tests/test_harness_smoke.py``), ``K == [3, 10, 20, 51]`` and the only helper
-is ``(20, 10, 2)``: χ_20 doubles χ_10.
+    S = Session.from_run("experiments/003/.../seed1")
+    measures.energy_support(S).K      # (3, 10, 20, 51) on the reference model
+    measures.helpers(S).helpers       # (20,): χ_20 doubles χ_10
 """
 
 from __future__ import annotations
 
-from collections import Counter
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -92,7 +86,7 @@ class Session:
             self._logits_grid = compute_logits_grid(self.model, self.ds)
         return self._logits_grid
 
-    # ---------- algebraic-substrate verbs ----------
+    # ---------- accessors shared by measures ----------
 
     def char_energy(self, W: Optional[torch.Tensor] = None) -> np.ndarray:
         """Per-character energy of ``W`` (defaults to W_E) in the natural basis."""
@@ -101,35 +95,6 @@ class Session:
         if W is None:
             W = self.model.embed.W_E[:, : self.ds.p].detach()
         return char_energy(W, self.basis, self.ci)
-
-    def essential(self, threshold: float = 0.05) -> dict:
-        """Essential characters K + per-char ablation (energy, ablated loss, Δlog10, class)."""
-        from .ablate import essential_characters
-
-        return essential_characters(self.model, self.ds, self.ci, self.basis, threshold=threshold)
-
-    def helpers(self, K=None, max_mult: int = 8) -> list:
-        """Primary/helper classification on K: ``[(helper_k, primary_m, mult, energy), ...]``."""
-        from .harmonic import find_primary_helper_pairs
-
-        if K is None:
-            K = self.essential()["K"]
-        return find_primary_helper_pairs(
-            self.model, self.ds, self.ci, self.basis, K, max_mult=max_mult
-        )
-
-    def delta_k_spectrum(self, k: int):
-        """Δ_k(Δlog) 1-D reduction + Fourier spectrum + dominant freq. See ``harmonic.py``."""
-        from .harmonic import delta_k_spectrum
-
-        return delta_k_spectrum(self.model, self.ds, self.ci, self.basis, k)
-
-    def order(self, k: int) -> int:
-        from .metrics import order_of
-
-        return order_of(k, self.ds.p)
-
-    # ---------- mech-interp-discovered verbs ----------
 
     def per_neuron_dominant_char(self) -> tuple[np.ndarray, np.ndarray]:
         """``(char_E[d_mlp, n_chars], dominant_char[d_mlp])``; cached after first call."""
@@ -144,14 +109,6 @@ class Session:
                 self.ds.p,
             )
         return self._dom
-
-    def cluster_sizes(self, K=None) -> dict[int, int]:
-        """Count of neurons whose argmax-character is each ``k ∈ K`` (free-rider check)."""
-        if K is None:
-            K = self.essential()["K"]
-        _, dom = self.per_neuron_dominant_char()
-        cnt = Counter(dom.tolist())
-        return {int(k): int(cnt.get(int(k), 0)) for k in K}
 
     def cluster_signal(self, k: int) -> Optional[np.ndarray]:
         """Reconstruct the (a, b) → χ_k(ab) signal from the χ_k neuron cluster.
@@ -199,37 +156,3 @@ class Session:
         y = self.ds.labels[tm]
         lg = logits[:, -1, : self.ds.n_answer_tokens][tm].double()
         return F.cross_entropy(lg, y).item()
-
-    # ---------- dynamics ----------
-
-    def dynamics(self, metrics_path: Optional[Path] = None) -> dict:
-        """Trajectory markers (bifurcation / commit / cliff) from a run's metrics.pt.
-
-        ``metrics_path`` defaults to ``<ds.run_dir>/metrics.pt`` if available — pass
-        explicitly otherwise. Returns a dict ``{"bifurcation", "commit", "cliff",
-        "K", "epochs"}``.
-        """
-        from .dynamics import bifurcation_step, cliff_step, commit_step
-
-        if metrics_path is None:
-            raise ValueError("metrics_path required (point at the run's metrics.pt)")
-        M = torch.load(metrics_path, weights_only=False)
-        L = torch.load(Path(metrics_path).with_name("losses.pt"), weights_only=False)
-        ep = np.asarray(M["epochs"])
-        fe = np.asarray(M["freq_energies"])
-        te = np.asarray(L["test_losses"])
-        n_chars = max(self.ci.freqs)
-        final = fe[-1]
-        K = sorted(int(k) for k in self.ci.freqs if final[k - 1] >= 0.05 * final.max())
-        Km = np.zeros(n_chars, bool)
-        Km[[k - 1 for k in K]] = True
-        bi = bifurcation_step(fe, Km, 1.5)
-        co = commit_step(fe, K, "subset")
-        cl = cliff_step(te, 0.1)
-        return {
-            "K": K,
-            "epochs": ep,
-            "bifurcation": int(ep[bi]) if bi is not None else None,
-            "commit": int(ep[co]) if co is not None else None,
-            "cliff": int(cl) if cl is not None else None,
-        }

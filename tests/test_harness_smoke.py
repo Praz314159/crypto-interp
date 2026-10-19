@@ -14,18 +14,6 @@ from crypto_interp.interp import (
 )
 
 
-def test_cost_atom(S):
-    """Essential set, the doubling helper, and per-primary neuron budgets."""
-    ess = S.essential(threshold=0.05)
-    assert sorted(ess["K"]) == [3, 10, 20, 51]
-
-    triples = sorted((h, m, mult) for (h, m, mult, _e) in S.helpers(ess["K"]))
-    assert triples == [(20, 10, 2)]
-
-    # The helper costs no dedicated neurons; the primaries share the other 32.
-    assert S.cluster_sizes(ess["K"]) == {3: 11, 10: 13, 20: 0, 51: 8}
-
-
 def test_mechanism_verification(S):
     """Each primary's neuron cluster reproduces cos(θ_k(a) + θ_k(b))."""
     for k, floor in [(3, 0.97), (10, 0.95)]:

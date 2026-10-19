@@ -20,6 +20,7 @@ ALLOWED = {
     "interp": {"models", "data", "runs", "reference"},
     "measures": {"interp", "runs", "models", "data", "reference"},
     "figures": {"measures"},
+    "theory": set(),
 }
 
 

@@ -42,7 +42,6 @@ from .metrics import (
     char_energy,
     char_energy_batch,
     correlate,
-    find_cliff,
     order_energy,
     order_of,
     per_frequency_energy_from_embedding,
@@ -112,7 +111,6 @@ __all__ = [
     "order_energy",
     "order_of",
     "correlate",
-    "find_cliff",
     "topk_recall",
     # grids
     "as_full_grid",

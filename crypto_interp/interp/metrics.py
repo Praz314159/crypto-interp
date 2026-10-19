@@ -192,13 +192,6 @@ def correlate(x, y) -> float:
     return float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y) + 1e-12))
 
 
-def find_cliff(losses, thresh: float = 0.1) -> int | None:
-    """First index where ``losses`` drops below ``thresh``; None if it never does."""
-    arr = np.asarray(losses, dtype=np.float64)
-    idx = np.where(arr < thresh)[0]
-    return int(idx[0]) if len(idx) else None
-
-
 def topk_recall(scores, K_set, k: int | None = None) -> float:
     """Fraction of ``K_set`` (1-based character ids) present in the top-k of
     ``scores`` (indexed by k-1). Defaults k = |K_set|."""

@@ -33,12 +33,19 @@ from .clock import (
     clock_residuals,
     token_table,
 )
-from .core import REGISTRY, Measure, measure
+from .core import REGISTRY, Measure, RunMeasure, measure, run_measure
+from .dynamics import DynamicsMarkers, GrokStatus, dynamics_markers, grok_status
 from .errors import ErrorProfile, errors
 from .kernel import REGIMES, KernelNoise, kernel_noise
 from .noise import NOISE_CLASSES, NoiseModes, noise_modes
 
 __all__ = [
+    "run_measure",
+    "grok_status",
+    "dynamics_markers",
+    "RunMeasure",
+    "GrokStatus",
+    "DynamicsMarkers",
     "neuron_clusters",
     "helpers",
     "fourier2d",

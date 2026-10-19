@@ -34,6 +34,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from crypto_interp import measures
 from crypto_interp.analysis.inference_viewer import char_plane, neuron_phases
 from crypto_interp.interp import Session
 from crypto_interp.interp.bases import discrete_log_table
@@ -49,8 +50,9 @@ def build_payload(S: Session) -> dict:
     g, dlog_map = discrete_log_table(p)
     dlog = [-1] + [dlog_map[a] for a in range(1, p)]
 
-    K = sorted(int(k) for k in S.essential()["K"])
-    helpers = {str(h): int(m) for (h, m, _mult, _e) in S.helpers(K)}
+    K = list(measures.energy_support(S).K)
+    h = measures.helpers(S, K=K)
+    helpers = {str(k): int(m) for k, m in zip(h.helpers, h.helper_of, strict=True)}
     _, dom = S.per_neuron_dominant_char()
 
     m = S.model
