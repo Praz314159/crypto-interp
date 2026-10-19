@@ -32,7 +32,7 @@ from typing import Callable, Sequence, Union, overload
 import torch
 from jaxtyping import Float, Int
 
-from .cache import ActivationCache
+from .cache import ActivationCache, HookKey
 from .hooks import _resolve_hook_name, run_with_hooks
 
 
@@ -57,24 +57,24 @@ def _patch_all_hook(clean_act: torch.Tensor):
 
 @overload
 def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: str,
+              clean_cache: ActivationCache, hook_name: HookKey,
               metric_fn: MetricFn, positions: None = ...,
               ) -> Float[torch.Tensor, "pos"]: ...
 @overload
 def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: str,
+              clean_cache: ActivationCache, hook_name: HookKey,
               metric_fn: MetricFn, positions: Sequence[int] = ...,
               ) -> Float[torch.Tensor, "n_positions"]: ...
 @overload
 def act_patch(model, corrupted_inputs: Int[torch.Tensor, "batch pos"],
-              clean_cache: ActivationCache, hook_name: str,
+              clean_cache: ActivationCache, hook_name: HookKey,
               metric_fn: MetricFn, positions: str = ...,
               ) -> float: ...
 @torch.no_grad()
 def act_patch(model,
               corrupted_inputs: Int[torch.Tensor, "batch pos"],
               clean_cache: ActivationCache,
-              hook_name: str,
+              hook_name: HookKey,
               metric_fn: MetricFn,
               positions: Union[Sequence[int], str, None] = None,
               ) -> Union[torch.Tensor, float]:
@@ -87,8 +87,8 @@ def act_patch(model,
         clean_cache: an :class:`ActivationCache` from a *clean* forward pass.
             Must contain ``hook_name``; the activation's batch and sequence
             dimensions must match ``corrupted_inputs``.
-        hook_name: long name (``"blocks.0.hook_mlp_out"``) or short name
-            (``"mlp_out"``).
+        hook_name: long name (``"blocks.0.hook_mlp_out"``), short name
+            (``"mlp_out"``, 1-block models), or ``("mlp_out", layer)``.
         metric_fn: callable ``(logits_tensor) -> float`` (e.g.,
             ``Session.test_loss_metric`` or a custom logit-difference).
         positions:
@@ -133,18 +133,23 @@ def act_patch(model,
 
 # ---------- thin wrappers for common hook points ----------
 
-def patch_mlp_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None):
-    """:func:`act_patch` fixed to the block's MLP output (``blocks.0.hook_mlp_out``)."""
-    return act_patch(model, corrupted_inputs, clean_cache, "mlp_out", metric_fn, positions)
+def _at(short: str, layer: int | None):
+    return short if layer is None else (short, layer)
 
 
-def patch_resid_pre(model, corrupted_inputs, clean_cache, metric_fn, positions=None):
-    """:func:`act_patch` fixed to the block's pre-attention residual stream
-    (``blocks.0.hook_resid_pre``)."""
-    return act_patch(model, corrupted_inputs, clean_cache, "resid_pre", metric_fn, positions)
+def patch_mlp_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
+    """:func:`act_patch` fixed to a block's MLP output (``blocks.<layer>.hook_mlp_out``).
+    ``layer`` may be omitted in a 1-block model."""
+    return act_patch(model, corrupted_inputs, clean_cache, _at("mlp_out", layer), metric_fn, positions)
 
 
-def patch_attn_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None):
-    """:func:`act_patch` fixed to the block's attention output
-    (``blocks.0.hook_attn_out``)."""
-    return act_patch(model, corrupted_inputs, clean_cache, "attn_out", metric_fn, positions)
+def patch_resid_pre(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
+    """:func:`act_patch` fixed to a block's pre-attention residual stream
+    (``blocks.<layer>.hook_resid_pre``). ``layer`` may be omitted in a 1-block model."""
+    return act_patch(model, corrupted_inputs, clean_cache, _at("resid_pre", layer), metric_fn, positions)
+
+
+def patch_attn_out(model, corrupted_inputs, clean_cache, metric_fn, positions=None, layer=None):
+    """:func:`act_patch` fixed to a block's attention output
+    (``blocks.<layer>.hook_attn_out``). ``layer`` may be omitted in a 1-block model."""
+    return act_patch(model, corrupted_inputs, clean_cache, _at("attn_out", layer), metric_fn, positions)

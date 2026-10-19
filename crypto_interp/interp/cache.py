@@ -6,15 +6,14 @@ An ``ActivationCache`` is produced by :func:`crypto_interp.interp.activations.ru
 ergonomic accessors:
 
 - **Short-name resolution.** Long names like ``"blocks.0.mlp.hook_post"`` can be
-  accessed as ``cache["mlp_post"]`` (suffix match against ``hook_<name>``).
-  Disambiguation is required if a short name matches more than one hook (which
-  only happens once we have multi-block models — single-block is unambiguous).
+  accessed as ``cache["mlp_post"]`` when only one block has that hook, or as
+  ``cache["mlp_post", 0]`` to name the block (TransformerLens-style). In a
+  multi-block model the bare short name is ambiguous and raises ``KeyError``.
 - ``cache.final(name)`` — the final-position slice ``t[..., -1, :]``.
 - ``cache.grid(name)`` — reshape the ``(p², ...)`` first dim to ``(p, p, ...)``
   for value-token (a, b) grid analyses.
 - ``cache.decompose_resid()`` — return the {resid_pre, attn_out, mlp_out}
-  triple that sums to the post-block residual (1-block models; will generalize
-  to per-layer dicts when multi-block arrives).
+  triple that sums to the post-block residual (1-block models only).
 
 Dict-like (``__getitem__``, ``__contains__``, ``__iter__``, ``len``, ``keys``,
 ``values``, ``items``) but **not** a ``dict`` subclass — keeps the surface
@@ -22,11 +21,15 @@ explicit. Treat instances as immutable from outside.
 """
 
 from __future__ import annotations
-from typing import Iterator
+from typing import Iterable, Iterator, Union
 
 import einops
 import torch
 from jaxtyping import Float
+
+#: A hook name: full (``"blocks.1.mlp.hook_post"``), short (``"mlp_post"``), or
+#: short plus block index (``("mlp_post", 1)``).
+HookKey = Union[str, tuple[str, int]]
 
 
 def _short_name(full: str) -> str:
@@ -44,24 +47,48 @@ def _short_name(full: str) -> str:
     return "_".join(out)
 
 
+def _layer_of(full: str) -> int | None:
+    """``blocks.1.mlp.hook_post`` → ``1``; names outside a block → ``None``."""
+    segs = full.split(".")
+    if len(segs) > 1 and segs[0] == "blocks" and segs[1].isdigit():
+        return int(segs[1])
+    return None
+
+
+def resolve_name(names: Iterable[str], key: HookKey) -> str:
+    """Resolve ``key`` to exactly one of ``names``, or raise ``KeyError``.
+
+    ``key`` may be a full name, a short name that matches a single hook, or a
+    ``(short_name, layer)`` pair.
+    """
+    names = list(names)
+    if isinstance(key, tuple):
+        short, layer = key
+        matches = [n for n in names if _short_name(n) == short and _layer_of(n) == layer]
+        if len(matches) == 1:
+            return matches[0]
+        raise KeyError(f"no hook {short!r} in layer {layer}")
+    if key in names:
+        return key
+    matches = [n for n in names if _short_name(n) == key]
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        raise KeyError(f"{key!r} is ambiguous: matches {matches}; pass ({key!r}, layer)")
+    shorts = sorted({_short_name(n) for n in names})
+    raise KeyError(f"no hook matches {key!r}; short names available: {shorts}")
+
+
 class ActivationCache:
     def __init__(self, cache_dict: dict, p: int | None = None):
         # detach tensors to drop graphs; pass non-tensors through (e.g., logits, all_inputs)
         self._cache = {k: (v.detach() if isinstance(v, torch.Tensor) else v)
                        for k, v in cache_dict.items()}
         self._p = p
-        # forward index of short names → long names; ambiguous shorts left out.
-        self._short: dict[str, str] = {}
-        seen: dict[str, list[str]] = {}
-        for k in self._cache:
-            seen.setdefault(_short_name(k), []).append(k)
-        for short, longs in seen.items():
-            if len(longs) == 1:
-                self._short[short] = longs[0]
 
     # ---------- dict-like interface ----------
-    def __getitem__(self, key: str): return self._cache[self._resolve(key)]
-    def __contains__(self, key: str) -> bool:
+    def __getitem__(self, key: HookKey): return self._cache[self._resolve(key)]
+    def __contains__(self, key: HookKey) -> bool:
         try: self._resolve(key); return True
         except KeyError: return False
     def __iter__(self) -> Iterator[str]: return iter(self._cache)
@@ -73,18 +100,11 @@ class ActivationCache:
         return f"ActivationCache({len(self._cache)} keys, p={self._p})"
 
     # ---------- name resolution ----------
-    def _resolve(self, key: str) -> str:
-        if key in self._cache:
-            return key
-        if key in self._short:
-            return self._short[key]
-        raise KeyError(
-            f"no cached hook matches {key!r}; "
-            f"short names available: {sorted(self._short)}"
-        )
+    def _resolve(self, key: HookKey) -> str:
+        return resolve_name(self._cache, key)
 
     # ---------- ergonomic accessors ----------
-    def final(self, key: str) -> Float[torch.Tensor, "batch ..."]:
+    def final(self, key: HookKey) -> Float[torch.Tensor, "batch ..."]:
         """Slice the final sequence position: ``t[..., -1, :]`` for ``(batch, seq, *)`` shapes."""
         t = self[key]
         if t.dim() < 2:
@@ -95,7 +115,7 @@ class ActivationCache:
         # patterns it's [..., -1, :]. Both behave the same for our use.
         return t[..., -1, :]
 
-    def grid(self, key: str, p: int | None = None) -> Float[torch.Tensor, "p p ..."]:
+    def grid(self, key: HookKey, p: int | None = None) -> Float[torch.Tensor, "p p ..."]:
         """Reshape ``(p², ...)`` → ``(p, p, ...)`` over value-token (a, b) inputs.
 
         Requires p (passed at construction or here).
@@ -109,9 +129,13 @@ class ActivationCache:
         """Per-component contributions to the residual stream (1-block model).
 
         Returns ``{"resid_pre", "attn_out", "mlp_out"}``. Their sum equals
-        ``resid_post`` (the input to the unembed). Extends to per-layer dicts
-        in the multi-block setting later.
+        ``resid_post`` (the input to the unembed). Raises ``ValueError`` on a
+        multi-block cache; index components per block there, e.g.
+        ``cache["mlp_out", 1]``.
         """
+        layers = {_layer_of(k) for k in self._cache} - {None}
+        if len(layers) > 1:
+            raise ValueError(f"decompose_resid is defined for 1-block models; cache has blocks {sorted(layers)}")
         return {"resid_pre": self["resid_pre"],
                 "attn_out": self["attn_out"],
                 "mlp_out":  self["mlp_out"]}

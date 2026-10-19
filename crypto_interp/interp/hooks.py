@@ -20,8 +20,9 @@ Three small intervention factories are provided as convenience closures:
 - :func:`project_hook` — project onto a basis and keep only specified rows.
 
 Hook names accept short suffixes (e.g., ``"mlp_post"`` resolves to
-``"blocks.0.mlp.hook_post"``) when the short form is unambiguous — the same
-convention used by :class:`ActivationCache`.
+``"blocks.0.mlp.hook_post"``) when the short form is unambiguous, and
+``("mlp_post", layer)`` pairs in any model — the same convention used by
+:class:`ActivationCache`.
 """
 
 from __future__ import annotations
@@ -31,37 +32,19 @@ from typing import Callable, Sequence
 
 import torch
 
+from .cache import HookKey, resolve_name
 
 HookFn = Callable[[torch.Tensor, str], "torch.Tensor | None"]
 
 
-def _resolve_hook_name(model, name: str) -> str:
-    """Resolve ``name`` (long or short) to the model's HookPoint full name.
-
-    Uses the same short-name convention as :class:`ActivationCache` — drops
-    ``blocks`` / digit path segments, strips ``hook_`` prefixes, joins with ``_``.
-    """
-    from .cache import _short_name
-    by_name = {hp.name: hp for hp in model.hook_points()}
-    if name in by_name:
-        return name
-    short_to_long: dict[str, str] = {}
-    collisions: dict[str, list[str]] = {}
-    for n in by_name:
-        s = _short_name(n)
-        collisions.setdefault(s, []).append(n)
-    for s, longs in collisions.items():
-        if len(longs) == 1:
-            short_to_long[s] = longs[0]
-    if name in short_to_long:
-        return short_to_long[name]
-    if name in collisions:
-        raise KeyError(f"ambiguous short name {name!r}: matches {collisions[name]}")
-    raise KeyError(f"hook name {name!r} not found; short names: {sorted(short_to_long)}")
+def _resolve_hook_name(model, name: HookKey) -> str:
+    """Resolve ``name`` (full, short, or ``(short, layer)``) to the model's
+    HookPoint full name. See :func:`crypto_interp.interp.cache.resolve_name`."""
+    return resolve_name((hp.name for hp in model.hook_points()), name)
 
 
 @contextlib.contextmanager
-def hooks(model, fwd_hooks: Sequence[tuple[str, HookFn]]):
+def hooks(model, fwd_hooks: Sequence[tuple[HookKey, HookFn]]):
     """Context manager: attach ``(name, fn)`` hooks on entry, remove on exit.
 
     Cleanup is best-effort — exceptions during forward are propagated.
@@ -82,7 +65,7 @@ def hooks(model, fwd_hooks: Sequence[tuple[str, HookFn]]):
 
 @torch.no_grad()
 def run_with_hooks(model, inputs: torch.Tensor,
-                   fwd_hooks: Sequence[tuple[str, HookFn]]) -> torch.Tensor:
+                   fwd_hooks: Sequence[tuple[HookKey, HookFn]]) -> torch.Tensor:
     """Run forward with hooks attached, then clean up. Returns logits."""
     with hooks(model, fwd_hooks):
         return model(inputs)
