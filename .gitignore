@@ -34,9 +34,6 @@ experiments/*/data/
 # outputs/<analysis>/<experiment-id-or-"all">/
 outputs/
 
-# Drive-imported sweep archives — large, regeneratable on Colab
-imported_data/
-
 # Background-task / debug logs
 *.log
 
