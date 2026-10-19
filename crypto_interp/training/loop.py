@@ -20,9 +20,10 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from .. import data
+from ..data import TaskSpec
 from ..interp.metrics import EmbeddingEnergyTracker
 from ..models import Transformer, TransformerConfig
+from ..runs.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
 from .config import ExperimentConfig
 
 # ----------------------------- helpers -----------------------------
@@ -84,13 +85,6 @@ def pick_device(arg: str) -> torch.device:
     return torch.device(arg)
 
 
-def _stamp_checkpoint(cfg: ExperimentConfig, datasets_dir: Path) -> dict:
-    """Pack the config into the dict we attach to every checkpoint."""
-    out = cfg.to_checkpoint_dict()
-    out["datasets_dir"] = str(datasets_dir)
-    return out
-
-
 # Fields a resume() invocation is permitted to override; everything else must
 # carry over from the loaded checkpoint so the stamp keeps describing the model
 # that is actually being trained.
@@ -104,21 +98,16 @@ _RESUME_OVERRIDE_KEYS = (
 )
 
 
-def _stamp_resumed_checkpoint(
-    saved_cfg: dict,
-    cfg: ExperimentConfig,
-    datasets_dir: Path,
-) -> dict:
-    """Build a checkpoint stamp for resumed training.
+def _resumed_train_config(saved: dict, cfg: ExperimentConfig) -> dict:
+    """Training config for resumed training.
 
     Architecture, optimizer, and dataset fields are locked-in by the loaded
-    checkpoint (saved_cfg). Only runtime knobs may be overridden by the
-    resume invocation's cfg.
+    checkpoint. Only runtime knobs may be overridden by the resume
+    invocation's cfg.
     """
-    out = dict(saved_cfg)
+    out = dict(saved)
     for k in _RESUME_OVERRIDE_KEYS:
         out[k] = getattr(cfg, k)
-    out["datasets_dir"] = str(datasets_dir)
     return out
 
 
@@ -130,20 +119,21 @@ def _save_checkpoint(
     scheduler,
     train_losses,
     test_losses,
-    cfg_stamp: dict,
+    task: TaskSpec,
+    train_config: dict,
 ) -> None:
-    torch.save(
-        {
-            "epoch": epoch,
-            "model_state": model.state_dict(),
-            "optimizer_state": optimizer.state_dict(),
-            "scheduler_state": scheduler.state_dict(),
-            "train_losses": train_losses,
-            "test_losses": test_losses,
-            "config": cfg_stamp,
-        },
-        run_dir / f"checkpoint_{epoch:06d}.pt",
+    ckpt = Checkpoint(
+        epoch=epoch,
+        task=task,
+        model_config=model.cfg,
+        train_config=train_config,
+        model_state=model.state_dict(),
+        optimizer_state=optimizer.state_dict(),
+        scheduler_state=scheduler.state_dict(),
+        train_losses=train_losses,
+        test_losses=test_losses,
     )
+    save_checkpoint(ckpt, run_dir / f"checkpoint_{epoch:06d}.pt")
 
 
 # ----------------------------- public API -----------------------------
@@ -175,13 +165,8 @@ def train(
             "cause grokking-relevant loss spikes (see Nanda et al. appendix)."
         )
 
-    ds = data.load_or_build(
-        cache_dir=datasets_dir,
-        task=cfg.task,
-        p=cfg.p,
-        frac_train=cfg.frac_train,
-        seed=cfg.seed,
-    )
+    task = TaskSpec(task=cfg.task, p=cfg.p, frac_train=cfg.frac_train, seed=cfg.seed)
+    ds = task.build(cache_dir=datasets_dir)
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
@@ -191,15 +176,7 @@ def train(
         f"train={ds.n_train}, test={ds.n_test}, vocab={ds.vocab_size}"
     )
 
-    model_cfg = TransformerConfig(
-        d_vocab=ds.vocab_size,
-        d_model=cfg.d_model,
-        d_mlp=cfg.d_mlp,
-        num_heads=cfg.num_heads,
-        d_head=cfg.d_head,
-        n_ctx=cfg.n_ctx,
-        num_layers=cfg.num_layers,
-    )
+    model_cfg = TransformerConfig.from_dict({**cfg.to_checkpoint_dict(), "d_vocab": ds.vocab_size})
     model = Transformer(model_cfg).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {n_params:,}")
@@ -213,7 +190,7 @@ def train(
     warmup = max(cfg.warmup_steps, 1)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda s: min(s / warmup, 1.0))
 
-    cfg_stamp = _stamp_checkpoint(cfg, datasets_dir)
+    train_config = cfg.to_checkpoint_dict()
     train_losses: list[float] = []
     test_losses: list[float] = []
     fg_W_E: list[torch.Tensor] = []  # per-step W_E for the first fine_grained_until epochs
@@ -274,7 +251,8 @@ def train(
                         scheduler,
                         train_losses,
                         test_losses,
-                        cfg_stamp,
+                        task,
+                        train_config,
                     )
                     break
             else:
@@ -282,7 +260,15 @@ def train(
 
         if (epoch % cfg.save_every == 0) or (epoch == cfg.num_epochs - 1):
             _save_checkpoint(
-                run_dir, epoch, model, optimizer, scheduler, train_losses, test_losses, cfg_stamp
+                run_dir,
+                epoch,
+                model,
+                optimizer,
+                scheduler,
+                train_losses,
+                test_losses,
+                task,
+                train_config,
             )
 
     torch.save({"train_losses": train_losses, "test_losses": test_losses}, run_dir / "losses.pt")
@@ -330,36 +316,22 @@ def resume(
     datasets_dir = Path(datasets_dir)
 
     print(f"Resuming from {resume_ckpt}")
-    rckpt = torch.load(resume_ckpt, weights_only=False)
-    saved_cfg = rckpt["config"]
-
     device = pick_device(cfg.device)
     use_float64 = device.type != "mps"
     print(f"Device: {device}, high-precision (float64) loss: {use_float64}")
 
-    ds = data.load_or_build(
-        cache_dir=datasets_dir,
-        task=saved_cfg["task"],
-        p=saved_cfg["p"],
-        frac_train=saved_cfg["frac_train"],
-        seed=saved_cfg["seed"],
-    )
+    # map_location lets a checkpoint written on a GPU resume on a CPU-only machine.
+    rckpt = load_checkpoint(resume_ckpt, map_location=device)
+    saved_cfg = rckpt.train_config
+    task = rckpt.task
+    ds = task.build(cache_dir=datasets_dir)
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
     test_mask = ds.test_mask.to(device)
 
-    model_cfg = TransformerConfig(
-        d_vocab=ds.vocab_size,
-        d_model=saved_cfg["d_model"],
-        d_mlp=saved_cfg["d_mlp"],
-        num_heads=saved_cfg["num_heads"],
-        d_head=saved_cfg["d_head"],
-        n_ctx=saved_cfg.get("n_ctx", 3),
-        num_layers=saved_cfg.get("num_layers", 1),
-    )
-    model = Transformer(model_cfg).to(device)
-    model.load_state_dict(rckpt["model_state"])
+    model = rckpt.build_model(device)
+    model.train()
 
     optimizer = optim.AdamW(
         model.parameters(),
@@ -367,19 +339,19 @@ def resume(
         weight_decay=saved_cfg["weight_decay"],
         betas=(saved_cfg.get("beta1", 0.9), saved_cfg.get("beta2", 0.98)),
     )
-    optimizer.load_state_dict(rckpt["optimizer_state"])
+    optimizer.load_state_dict(rckpt.optimizer_state)
 
     warmup = max(saved_cfg.get("warmup_steps", 10), 1)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda s: min(s / warmup, 1.0))
-    if "scheduler_state" in rckpt:
-        scheduler.load_state_dict(rckpt["scheduler_state"])
+    if rckpt.scheduler_state is not None:
+        scheduler.load_state_dict(rckpt.scheduler_state)
     else:
-        for _ in range(rckpt["epoch"] + 1):
+        for _ in range(rckpt.epoch + 1):
             scheduler.step()
 
-    start_epoch = rckpt["epoch"] + 1
-    train_losses = list(rckpt["train_losses"])
-    test_losses = list(rckpt["test_losses"])
+    start_epoch = rckpt.epoch + 1
+    train_losses = list(rckpt.train_losses)
+    test_losses = list(rckpt.test_losses)
 
     tracker = EmbeddingEnergyTracker(p=ds.p, device=device) if cfg.metrics_every > 0 else None
     if tracker is not None and (run_dir / "metrics.pt").exists():
@@ -391,7 +363,7 @@ def resume(
     start = time.time()
     print(f"Resuming at epoch {start_epoch}, training {additional_epochs} more.")
 
-    cfg_stamp = _stamp_resumed_checkpoint(saved_cfg, cfg, datasets_dir)
+    train_config = _resumed_train_config(saved_cfg, cfg)
 
     for epoch in range(start_epoch, end_epoch):
         last_epoch_done = epoch
@@ -433,7 +405,8 @@ def resume(
                         scheduler,
                         train_losses,
                         test_losses,
-                        cfg_stamp,
+                        task,
+                        train_config,
                     )
                     break
             else:
@@ -441,7 +414,15 @@ def resume(
 
         if (epoch % cfg.save_every == 0) or (epoch == end_epoch - 1):
             _save_checkpoint(
-                run_dir, epoch, model, optimizer, scheduler, train_losses, test_losses, cfg_stamp
+                run_dir,
+                epoch,
+                model,
+                optimizer,
+                scheduler,
+                train_losses,
+                test_losses,
+                task,
+                train_config,
             )
 
     torch.save({"train_losses": train_losses, "test_losses": test_losses}, run_dir / "losses.pt")
@@ -451,8 +432,8 @@ def resume(
             config={
                 "task": ds.task,
                 "p": ds.p,
-                "seed": saved_cfg["seed"],
-                "frac_train": saved_cfg["frac_train"],
+                "seed": task.seed,
+                "frac_train": task.frac_train,
                 "metrics_every": cfg.metrics_every,
             },
         )
