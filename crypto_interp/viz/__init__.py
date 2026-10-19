@@ -1,5 +1,5 @@
-"""Visualizations of one model's forward pass: a static figure and an interactive page."""
+"""Visualizations of one model's forward pass."""
 
-from . import walkthrough, web
+from . import walkthrough
 
-__all__ = ["walkthrough", "web"]
+__all__ = ["walkthrough"]

@@ -8,7 +8,6 @@
     crypto-interp measure kernel_noise --experiment 003 --where d_mlp=20 --out table.csv
     crypto-interp figure  regimes --experiment 00 --where d_model=24 --out regimes.png
     crypto-interp figure  list
-    crypto-interp view    --run experiments/003_dmodel_sweep_p113/runs/<run> --out page.html
 """
 
 from __future__ import annotations
@@ -65,16 +64,6 @@ def _figure_main(args) -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
     print(f"wrote {args.out}")
-
-
-def _view_main(args) -> None:
-    from ..viz.web import export
-
-    pop = select(args)
-    if len(pop) != 1:
-        raise SystemExit(f"view is for one run; the selection has {len(pop)}")
-    out = export(pop[0].path, args.out)
-    print(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB)")
 
 
 def _runs_main(args) -> None:
@@ -152,11 +141,6 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--title")
     f.add_argument("--dpi", type=int, default=130)
     f.set_defaults(func=_figure_main)
-
-    v = sub.add_parser("view", help="write one run's interactive walkthrough page (HTML)")
-    add_selection_args(v)
-    v.add_argument("--out", type=Path, required=True)
-    v.set_defaults(func=_view_main)
     return ap
 
 

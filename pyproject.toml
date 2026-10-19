@@ -28,9 +28,6 @@ crypto-interp = "crypto_interp.cli:main"
 # ruff is pinned exactly so local and CI format identically.
 dev = ["pytest>=8", "ruff==0.17.1"]
 
-[tool.setuptools.package-data]
-"crypto_interp.viz" = ["assets/*"]
-
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
 exclude = ["experiments*", "scripts*", "notes*", "papers*", "infra*"]
