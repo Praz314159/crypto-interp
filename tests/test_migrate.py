@@ -29,10 +29,13 @@ def _cfg(**kw):
     return ExperimentConfig(**{**base, **kw})
 
 
-def _to_schema_1(run):
+def _to_schema_1(run, drop=()):
     """Rewrite a run's checkpoints the way the old training loop stored them."""
     for path in checkpoint_paths(run):
         ck = load_checkpoint(path)
+        config = {**ck.train_config, "datasets_dir": "/elsewhere/datasets"}
+        for k in drop:
+            config.pop(k)
         torch.save(
             {
                 "epoch": ck.epoch,
@@ -41,7 +44,7 @@ def _to_schema_1(run):
                 "scheduler_state": ck.scheduler_state,
                 "train_losses": ck.train_losses,
                 "test_losses": ck.test_losses,
-                "config": {**ck.train_config, "datasets_dir": "/elsewhere/datasets"},
+                "config": config,
             },
             path,
         )
@@ -96,3 +99,33 @@ def test_seed_named_directory_with_another_seed_is_excluded(tmp_path):
 
     migrate([str(run), "--apply"])
     assert len(json.loads((run / "manifest.json").read_text())["migrations"]) == 1
+
+
+def test_task_is_inferred_from_recorded_losses(tmp_path):
+    """The earliest runs never stored a task; the right one is the task whose
+    dataset reproduces the losses the run recorded (here not the default, mul)."""
+    run = tmp_path / "runs" / "early_run"
+    train(_cfg(task="sqrt_of_product"), run, tmp_path / "datasets")
+    _to_schema_1(run, drop=("task",))
+    with pytest.raises(KeyError, match="task"):
+        load_checkpoint(checkpoint_paths(run)[-1])
+
+    migrate([str(run), "--apply"])
+
+    ckpts = [load_checkpoint(p) for p in checkpoint_paths(run)]
+    assert {(c.source_schema, c.task.task) for c in ckpts} == {(2, "sqrt_of_product")}
+    notes = json.loads((run / "manifest.json").read_text())["migrations"][0]["notes"]
+    assert any("sqrt_of_product" in n for n in notes)
+
+
+def test_wrong_task_is_corrected(tmp_path):
+    """A schema-2 file stamped with the wrong task (as a bad default would leave it)."""
+    run = tmp_path / "runs" / "mislabelled"
+    train(_cfg(task="sqrt_of_product"), run, tmp_path / "datasets")
+    for path in checkpoint_paths(run):
+        ck = load_checkpoint(path)
+        torch.save({**ck.to_dict(), "task": {**ck.task.to_dict(), "task": "add"}}, path)
+
+    migrate([str(run), "--apply"])
+
+    assert load_checkpoint(checkpoint_paths(run)[-1]).task.task == "sqrt_of_product"
