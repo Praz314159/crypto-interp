@@ -24,6 +24,9 @@ notes/
 research_directions.md
 experiments/*/README.md
 
+# Measure results cached in the reference run when the docs are followed in place
+tests/fixtures/*/measures/
+
 # Experiment outputs — regenerable, can be large
 experiments/*/runs/
 experiments/*/datasets/
