@@ -22,7 +22,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.14"]
+# ruff is pinned exactly so local and CI format identically.
+dev = ["pytest>=8", "ruff==0.17.1"]
 
 [tool.setuptools.packages.find]
 include = ["crypto_interp*"]
