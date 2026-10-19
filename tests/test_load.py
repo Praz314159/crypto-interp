@@ -31,9 +31,9 @@ def test_load_run_keeps_architecture(tmp_path):
     )
     ckpt = tmp_path / "run" / "checkpoint_000000.pt"
     ckpt.parent.mkdir()
-    torch.save({"model_state": model.state_dict(), "config": cfg}, ckpt)
+    torch.save({"epoch": 0, "model_state": model.state_dict(), "config": cfg}, ckpt)
 
-    loaded, ds, _ = load_run(ckpt, datasets_dir=tmp_path / "datasets")
+    loaded, ds, _ = load_run(ckpt)
 
     assert len(loaded.blocks) == 2
     for (name, a), (_, b) in zip(

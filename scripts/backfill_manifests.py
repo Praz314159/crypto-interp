@@ -20,7 +20,7 @@ import json
 import re
 from pathlib import Path
 
-import torch
+from crypto_interp.runs import load_checkpoint
 
 CKPT_RE = re.compile(r"checkpoint_(\d+)\.pt$")
 
@@ -40,8 +40,7 @@ def backfill_one(run_dir: Path, source: str, force: bool) -> str:
 
     config = None
     try:
-        payload = torch.load(ckpts[-1][1], map_location="cpu", weights_only=False)
-        config = payload.get("config") if isinstance(payload, dict) else None
+        config = load_checkpoint(ckpts[-1][1]).train_config
     except Exception:
         pass
 

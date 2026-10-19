@@ -72,6 +72,10 @@ def import_one(src: Path, p: int, seed: int, repo_root: Path, *, dry_run: bool) 
 
     if dst.exists() and (dst / "metrics.pt").exists():
         return f"  exists {dst.relative_to(repo_root)} (skip)"
+    # Copying into a directory that already holds checkpoints mixes two runs in
+    # one place (this is how the 004/005 stray checkpoints arose).
+    if dst.exists() and any(dst.glob("checkpoint_*.pt")):
+        return f"  conflict {dst.relative_to(repo_root)}: already has checkpoints (skip)"
 
     if dry_run:
         return f"  would copy {src.name} -> {dst.relative_to(repo_root)} ({len(ckpts)} ckpts)"

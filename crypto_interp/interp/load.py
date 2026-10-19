@@ -1,19 +1,8 @@
-"""Load a trained checkpoint into a (model, dataset, ckpt) triple."""
+"""Load a trained checkpoint into a (model, dataset, checkpoint) triple."""
 
-import dataclasses
 from pathlib import Path
 
-import torch
-
-from .. import data
-from ..models import Transformer, TransformerConfig
-
-
-def _infer_datasets_dir(ckpt_path: Path) -> Path:
-    """Convention: checkpoints live at ``<experiment>/runs/<tag>/checkpoint_*.pt``,
-    so the dataset cache for that experiment is ``<experiment>/datasets/``.
-    """
-    return ckpt_path.resolve().parents[2] / "datasets"
+from ..runs.checkpoint import Checkpoint, checkpoint_paths, load_checkpoint
 
 
 def load_run(
@@ -21,49 +10,21 @@ def load_run(
     device: str = "cpu",
     datasets_dir: str | Path | None = None,
 ):
-    """Load a checkpoint and return (model, dataset, ckpt_dict).
+    """Load a checkpoint and return ``(model, dataset, Checkpoint)``.
 
-    ``datasets_dir`` defaults to ``<ckpt>/../../datasets`` per repo convention.
-    Pass it explicitly when loading a checkpoint from a non-standard location.
+    Reads checkpoints of any schema. The dataset is rebuilt from the
+    checkpoint's task spec, in memory unless ``datasets_dir`` names a cache.
     """
-    ckpt_path = Path(ckpt_path)
-    # map_location=device lets checkpoints trained on another device (e.g. a Colab
-    # GPU) load on this machine; without it CUDA-saved tensors fail on a CPU box.
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
-    cfg_dict = ckpt["config"]
-
-    if datasets_dir is None:
-        # Prefer the datasets_dir baked into the checkpoint, but only if it still
-        # exists — checkpoints trained elsewhere (e.g. Colab) bake in a path that
-        # isn't present locally; in that case infer from the checkpoint location.
-        baked = cfg_dict.get("datasets_dir")
-        datasets_dir = baked if (baked and Path(baked).exists()) else _infer_datasets_dir(ckpt_path)
-    datasets_dir = Path(datasets_dir)
-
-    ds = data.load_or_build(
-        cache_dir=datasets_dir,
-        task=cfg_dict["task"],
-        p=cfg_dict["p"],
-        frac_train=cfg_dict["frac_train"],
-        seed=cfg_dict["seed"],
-    )
-    # Every architecture field the checkpoint records (n_ctx, num_layers, ...);
-    # fields it predates fall back to the TransformerConfig defaults.
-    arch = {
-        f.name: cfg_dict[f.name]
-        for f in dataclasses.fields(TransformerConfig)
-        if f.name != "d_vocab" and f.name in cfg_dict
-    }
-    cfg = TransformerConfig(d_vocab=ds.vocab_size, **arch)
-    model = Transformer(cfg).to(device)
-    model.load_state_dict(ckpt["model_state"])
-    model.eval()
-    return model, ds, ckpt
+    # map_location=device lets checkpoints trained on another device (e.g. a GPU)
+    # load on this machine; without it CUDA-saved tensors fail on a CPU box.
+    ckpt: Checkpoint = load_checkpoint(ckpt_path, map_location=device)
+    ds = ckpt.task.build(cache_dir=datasets_dir)
+    return ckpt.build_model(device), ds, ckpt
 
 
 def latest_checkpoint(run_dir: str | Path) -> Path:
-    run_dir = Path(run_dir)
-    ckpts = sorted(run_dir.glob("checkpoint_*.pt"))
+    """The run's highest-epoch checkpoint (quarantined ``_strays/`` are ignored)."""
+    ckpts = checkpoint_paths(run_dir)
     if not ckpts:
         raise FileNotFoundError(f"No checkpoints in {run_dir}")
     return ckpts[-1]

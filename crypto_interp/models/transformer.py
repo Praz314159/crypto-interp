@@ -11,7 +11,9 @@ Forward pass on input [a, b, =]:
 We take logits at the final position only.
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, fields
 
 import einops
 import numpy as np
@@ -155,8 +157,22 @@ class TransformerConfig:
     n_ctx: int = 3
     num_layers: int = 1
 
+    @classmethod
+    def from_dict(cls, d: dict) -> TransformerConfig:
+        """Build from a dict that may carry other keys (e.g. a training config).
+
+        Architecture fields the dict lacks take their defaults; ``d_vocab`` is required.
+        """
+        return cls(**{f.name: d[f.name] for f in fields(cls) if f.name in d})
+
 
 class Transformer(nn.Module):
+    @classmethod
+    def from_config(cls, cfg: TransformerConfig | dict) -> Transformer:
+        if isinstance(cfg, dict):
+            cfg = TransformerConfig.from_dict(cfg)
+        return cls(cfg)
+
     def __init__(self, cfg: TransformerConfig):
         super().__init__()
         self.cfg = cfg
