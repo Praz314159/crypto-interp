@@ -209,12 +209,9 @@ def decompose(run_dir: Path) -> dict:
     kernel_power = float(np.sum(kappa**2))  # Σ_d |κ(d)|²
     kernel_in_3d = n * n * kernel_power  # spread across n² values of d⁻¹ orbit
 
-    from crypto_interp.interp.theory import (
-        empirical_test_loss_from_logits,
-        kernel_loss,
-    )
+    from crypto_interp.measures.kernel import empirical_loss, kernel_loss
 
-    L_emp = empirical_test_loss_from_logits(logits, p)
+    L_emp = empirical_loss(logits, p)
     L_sym = kernel_loss(kappa)
 
     return {
