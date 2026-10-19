@@ -5,6 +5,7 @@ from .checkpoint import (
     Checkpoint,
     checkpoint_epoch,
     checkpoint_paths,
+    latest_checkpoint,
     load_checkpoint,
     save_checkpoint,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "checkpoint_epoch",
     "checkpoint_paths",
     "discover",
+    "latest_checkpoint",
     "load_checkpoint",
     "query",
     "read_manifest",

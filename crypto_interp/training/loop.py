@@ -12,6 +12,7 @@ import datetime
 import socket
 import subprocess
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -20,10 +21,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from ..data import TaskSpec
-from ..interp.metrics import EmbeddingEnergyTracker
 from ..models import Transformer, TransformerConfig
 from ..runs.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
 from ..runs.manifest import make_manifest, write_manifest
+from .callbacks import TrainingCallback
 from .config import ExperimentConfig
 
 # ----------------------------- helpers -----------------------------
@@ -142,17 +143,12 @@ def _save_checkpoint(
 # ----------------------------- public API -----------------------------
 
 
-def train(
-    cfg: ExperimentConfig,
-    run_dir: Path,
-    datasets_dir: Path,
-) -> dict:
+def train(cfg: ExperimentConfig, run_dir: Path, callbacks: Sequence[TrainingCallback] = ()) -> dict:
     """Train a fresh model under ``cfg`` and write artifacts to ``run_dir``.
 
     Returns the final (train_loss, test_loss) as a dict for convenience.
     """
     run_dir = Path(run_dir)
-    datasets_dir = Path(datasets_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     torch.manual_seed(cfg.seed)
@@ -168,7 +164,7 @@ def train(
         )
 
     task = TaskSpec(task=cfg.task, p=cfg.p, frac_train=cfg.frac_train, seed=cfg.seed)
-    ds = task.build(cache_dir=datasets_dir)
+    ds = task.build()
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
@@ -199,9 +195,8 @@ def train(
     fg_W_E: list[torch.Tensor] = []  # per-step W_E for the first fine_grained_until epochs
     fg_epochs: list[int] = []
 
-    tracker = EmbeddingEnergyTracker(p=ds.p, device=device) if cfg.metrics_every > 0 else None
-    if tracker is not None:
-        print(f"Tracking metrics every {cfg.metrics_every} epochs.")
+    for cb in callbacks:
+        cb.on_train_start(run_dir, model, task, start_epoch=0)
 
     start = time.time()
     early_stop_streak = 0
@@ -228,8 +223,8 @@ def train(
         scheduler.step()
         optimizer.zero_grad()
 
-        if tracker is not None and epoch % cfg.metrics_every == 0:
-            tracker.record(epoch, model.embed.W_E[:, : ds.p].detach())
+        for cb in callbacks:
+            cb.on_epoch_end(epoch, model)
 
         if epoch % cfg.log_every == 0:
             elapsed = time.time() - start
@@ -281,18 +276,8 @@ def train(
             run_dir / "fine_grained.pt",
         )
         print(f"Saved fine-grained W_E ({len(fg_W_E)} steps): {run_dir / 'fine_grained.pt'}")
-    if tracker is not None:
-        tracker.save(
-            run_dir / "metrics.pt",
-            config={
-                "task": ds.task,
-                "p": ds.p,
-                "seed": cfg.seed,
-                "frac_train": cfg.frac_train,
-                "metrics_every": cfg.metrics_every,
-            },
-        )
-        print(f"Saved metrics: {run_dir / 'metrics.pt'}")
+    for cb in callbacks:
+        cb.on_train_end(run_dir)
     print(f"Done. Final train loss {train_losses[-1]:.6f}, test loss {test_losses[-1]:.6f}")
     return {
         "epoch": last_epoch_done,
@@ -306,7 +291,7 @@ def resume(
     cfg: ExperimentConfig,
     resume_ckpt: Path,
     additional_epochs: int,
-    datasets_dir: Path,
+    callbacks: Sequence[TrainingCallback] = (),
 ) -> dict:
     """Continue training from a checkpoint, appending to losses/metrics in place.
 
@@ -316,7 +301,6 @@ def resume(
     """
     resume_ckpt = Path(resume_ckpt)
     run_dir = resume_ckpt.parent
-    datasets_dir = Path(datasets_dir)
 
     print(f"Resuming from {resume_ckpt}")
     device = pick_device(cfg.device)
@@ -327,7 +311,7 @@ def resume(
     rckpt = load_checkpoint(resume_ckpt, map_location=device)
     saved_cfg = rckpt.train_config
     task = rckpt.task
-    ds = task.build(cache_dir=datasets_dir)
+    ds = task.build()
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
@@ -361,9 +345,8 @@ def resume(
     train_losses = list(rckpt.train_losses)
     test_losses = list(rckpt.test_losses)
 
-    tracker = EmbeddingEnergyTracker(p=ds.p, device=device) if cfg.metrics_every > 0 else None
-    if tracker is not None and (run_dir / "metrics.pt").exists():
-        tracker.restore(torch.load(run_dir / "metrics.pt", weights_only=False))
+    for cb in callbacks:
+        cb.on_train_start(run_dir, model, task, start_epoch=start_epoch)
 
     end_epoch = start_epoch + additional_epochs
     early_stop_streak = 0
@@ -390,8 +373,8 @@ def resume(
         scheduler.step()
         optimizer.zero_grad()
 
-        if tracker is not None and epoch % cfg.metrics_every == 0:
-            tracker.record(epoch, model.embed.W_E[:, : ds.p].detach())
+        for cb in callbacks:
+            cb.on_epoch_end(epoch, model)
 
         if epoch % cfg.log_every == 0:
             elapsed = time.time() - start
@@ -434,17 +417,8 @@ def resume(
             )
 
     torch.save({"train_losses": train_losses, "test_losses": test_losses}, run_dir / "losses.pt")
-    if tracker is not None:
-        tracker.save(
-            run_dir / "metrics.pt",
-            config={
-                "task": ds.task,
-                "p": ds.p,
-                "seed": task.seed,
-                "frac_train": task.frac_train,
-                "metrics_every": cfg.metrics_every,
-            },
-        )
+    for cb in callbacks:
+        cb.on_train_end(run_dir)
     print(f"Done. Final train {train_losses[-1]:.6f}, test {test_losses[-1]:.6f}")
     return {
         "epoch": last_epoch_done,

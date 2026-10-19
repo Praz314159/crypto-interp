@@ -16,7 +16,7 @@ def _train(path, **kw):
         save_every=5,
         log_every=1000,
     )
-    train(ExperimentConfig(**{**cfg, **kw}), path, path.parent / "datasets")
+    train(ExperimentConfig(**{**cfg, **kw}), path)
     return path
 
 

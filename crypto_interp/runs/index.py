@@ -26,7 +26,13 @@ from pathlib import Path
 from typing import Any
 
 from ..data.spec import TaskSpec
-from .checkpoint import Checkpoint, checkpoint_epoch, checkpoint_paths, load_checkpoint
+from .checkpoint import (
+    Checkpoint,
+    checkpoint_epoch,
+    checkpoint_paths,
+    latest_checkpoint,
+    load_checkpoint,
+)
 from .manifest import MANIFEST_VERSION, describe, read_manifest
 
 DEFAULT_ROOT = Path("experiments")
@@ -61,10 +67,7 @@ class Run:
         return checkpoint_paths(self.path)
 
     def latest(self) -> Path:
-        ckpts = self.checkpoints()
-        if not ckpts:
-            raise FileNotFoundError(f"no checkpoints in {self.path}")
-        return ckpts[-1]
+        return latest_checkpoint(self.path)
 
     def load(self, epoch: int | None = None, map_location: str = "cpu") -> Checkpoint:
         """The checkpoint at ``epoch`` (default: the latest)."""

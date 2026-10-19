@@ -9,6 +9,7 @@ sparse concentration on a few key frequencies.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -86,6 +87,47 @@ class EmbeddingEnergyTracker:
             },
             path,
         )
+
+
+class EmbeddingEnergyCallback:
+    """Training callback: record per-character energy of ``W_E`` every ``every`` epochs
+    and save it to ``<run_dir>/metrics.pt``. On resume it appends to the saved record.
+
+    Use :meth:`for_task` rather than the constructor: the energy is only meaningful
+    in the task's own character basis, and only ``mul`` has one defined here.
+    """
+
+    FILENAME = "metrics.pt"
+
+    def __init__(self, p: int, every: int):
+        self.p = p
+        self.every = every
+        self.tracker: EmbeddingEnergyTracker | None = None
+        self._config: dict = {}
+
+    @classmethod
+    def for_task(cls, task, every: int) -> EmbeddingEnergyCallback:
+        if task.task != "mul":
+            raise ValueError(
+                f"no character basis for embedding-energy tracking on task {task.task!r} "
+                "(only 'mul'); set metrics_every=0"
+            )
+        return cls(task.p, every)
+
+    def on_train_start(self, run_dir, model, task, start_epoch: int) -> None:
+        device = model.embed.W_E.device
+        self.tracker = EmbeddingEnergyTracker(p=self.p, device=device)
+        saved = Path(run_dir) / self.FILENAME
+        if start_epoch > 0 and saved.exists():
+            self.tracker.restore(torch.load(saved, weights_only=False))
+        self._config = {**task.to_dict(), "metrics_every": self.every}
+
+    def on_epoch_end(self, epoch: int, model) -> None:
+        if epoch % self.every == 0:
+            self.tracker.record(epoch, model.embed.W_E[:, : self.p].detach())
+
+    def on_train_end(self, run_dir) -> None:
+        self.tracker.save(Path(run_dir) / self.FILENAME, config=self._config)
 
 
 # ---------- Per-character energy (keyed by CharIndex) ----------
