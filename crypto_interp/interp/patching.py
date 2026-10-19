@@ -66,7 +66,7 @@ def act_patch(
     hook_name: HookKey,
     metric_fn: MetricFn,
     positions: None = ...,
-) -> Float[torch.Tensor, "pos"]: ...
+) -> Float[torch.Tensor, " pos"]: ...
 @overload
 def act_patch(
     model,
@@ -75,7 +75,7 @@ def act_patch(
     hook_name: HookKey,
     metric_fn: MetricFn,
     positions: Sequence[int] = ...,
-) -> Float[torch.Tensor, "n_positions"]: ...
+) -> Float[torch.Tensor, " n_positions"]: ...
 @overload
 def act_patch(
     model,

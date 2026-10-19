@@ -228,15 +228,11 @@ if __name__ == "__main__":
     mul_basis, mul_names, g = multiplicative_fourier_basis(p)
 
     print(f"Additive basis shape: {add_basis.shape}")
-    add_orth = add_basis @ add_basis.T
-    print(
-        f"  orthonormality error: {(add_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}"
-    )
+    add_err = (add_basis @ add_basis.T - torch.eye(p, dtype=torch.float64)).abs().max().item()
+    print(f"  orthonormality error: {add_err:.3e}")
 
     print(f"\nMultiplicative basis (p={p}, primitive root g={g}):")
     print(f"  shape: {mul_basis.shape}")
-    mul_orth = mul_basis @ mul_basis.T
-    print(
-        f"  orthonormality error: {(mul_orth - torch.eye(p, dtype=torch.float64)).abs().max().item():.3e}"
-    )
+    mul_err = (mul_basis @ mul_basis.T - torch.eye(p, dtype=torch.float64)).abs().max().item()
+    print(f"  orthonormality error: {mul_err:.3e}")
     print(f"  first 5 names: {mul_names[:5]}")

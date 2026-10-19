@@ -17,8 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from crypto_interp.training import parse_seeds, run_sweep
-from crypto_interp.training.sweep import SweepArgs
+from crypto_interp.training import parse_seeds, run_sweep  # noqa: E402
+from crypto_interp.training.sweep import SweepArgs  # noqa: E402
 
 
 def main():

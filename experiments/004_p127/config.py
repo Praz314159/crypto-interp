@@ -13,7 +13,8 @@ run_dmlp_seed_sweep.py overrides d_mlp and seed per child run:
         --experiment 004_p127 --d-mlps 32,128 --seeds 1,2,3 --epochs 40000
 Analyze any resulting run with the canonical library analyses, e.g.:
     python -m crypto_interp.analysis.delta_spectrum --run-dir experiments/004_p127/runs/<run>
-    python -m crypto_interp.analysis.bifurcation --data-dir experiments/004_p127/data  # if collected
+    # if collected:
+    python -m crypto_interp.analysis.bifurcation --data-dir experiments/004_p127/data
 """
 
 from crypto_interp.training import ExperimentConfig

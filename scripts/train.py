@@ -3,7 +3,8 @@
 Usage:
     python scripts/train.py --experiment 001_mul_p113 --tag main_run
     python scripts/train.py --experiment 001_mul_p113 --seed-override 7 --tag seed7
-    python scripts/train.py --experiment 001_mul_p113 --resume experiments/001_mul_p113/runs/main_run/checkpoint_006500.pt --num-epochs 2000
+    python scripts/train.py --experiment 001_mul_p113 \
+        --resume experiments/001_mul_p113/runs/main_run/checkpoint_006500.pt --num-epochs 2000
 
 Loads ``experiments/<id>/config.py:CONFIG`` and hands it to the library's
 training loop. CLI flags can override the high-traffic knobs (seed, epochs,

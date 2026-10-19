@@ -46,9 +46,11 @@ def backfill_one(run_dir: Path, source: str, force: bool) -> str:
         pass
 
     mtimes = [p.stat().st_mtime for _, p in ckpts]
-    fmt = lambda t: datetime.datetime.fromtimestamp(t, tz=datetime.timezone.utc).isoformat(
-        timespec="seconds"
-    )
+
+    def fmt(t):
+        return datetime.datetime.fromtimestamp(t, tz=datetime.timezone.utc).isoformat(
+            timespec="seconds"
+        )
 
     manifest = {
         "backfilled": True,

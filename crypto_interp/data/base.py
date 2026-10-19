@@ -53,7 +53,7 @@ def assemble(
     inputs = torch.zeros(n, 3, dtype=torch.long)
     labels_t = torch.zeros(n, dtype=torch.long)
     train_mask = torch.zeros(n, dtype=torch.bool)
-    for i, ((a, b), y) in enumerate(zip(pairs, labels)):
+    for i, ((a, b), y) in enumerate(zip(pairs, labels, strict=True)):
         inputs[i, 0] = a
         inputs[i, 1] = b
         inputs[i, 2] = eq_token

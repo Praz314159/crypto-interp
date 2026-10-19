@@ -37,7 +37,9 @@ def test_hooks_target_one_layer(two_layer):
     clean = model(inputs)
     with pytest.raises(KeyError, match="ambiguous"):
         run_with_hooks(model, inputs, [("mlp_out", zero_hook())])
-    by_layer = [run_with_hooks(model, inputs, [(("mlp_out", l), zero_hook())]) for l in (0, 1)]
+    by_layer = [
+        run_with_hooks(model, inputs, [(("mlp_out", layer), zero_hook())]) for layer in (0, 1)
+    ]
     assert not torch.allclose(by_layer[0], clean)
     assert not torch.allclose(by_layer[1], clean)
     assert not torch.allclose(by_layer[0], by_layer[1])
@@ -47,7 +49,10 @@ def test_patch_with_layer(two_layer):
     """Patching a layer's clean activation into the same inputs changes nothing."""
     model, inputs = two_layer
     _, cache = run_with_cache(model, inputs)
-    metric = lambda logits: float(logits.abs().sum())
+
+    def metric(logits):
+        return float(logits.abs().sum())
+
     with torch.no_grad():
         base = metric(model(inputs))
     out = patch_mlp_out(model, inputs, cache, metric, layer=1)

@@ -36,6 +36,8 @@ def test_load_run_keeps_architecture(tmp_path):
     loaded, ds, _ = load_run(ckpt, datasets_dir=tmp_path / "datasets")
 
     assert len(loaded.blocks) == 2
-    for (name, a), (_, b) in zip(model.state_dict().items(), loaded.state_dict().items()):
+    for (name, a), (_, b) in zip(
+        model.state_dict().items(), loaded.state_dict().items(), strict=True
+    ):
         assert torch.equal(a, b), name
     assert torch.equal(model(ds.inputs), loaded(ds.inputs))
