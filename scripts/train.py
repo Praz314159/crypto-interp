@@ -135,19 +135,26 @@ def main():
     exp_dir = REPO_ROOT / "experiments" / args.experiment
 
     # Import inside main so --help doesn't pull in torch.
+    from crypto_interp.data import TaskSpec
+    from crypto_interp.interp.metrics import EmbeddingEnergyCallback
     from crypto_interp.training import resume, train
+
+    callbacks = []
+    if cfg.metrics_every > 0:
+        task = TaskSpec(cfg.task, cfg.p, cfg.frac_train, cfg.seed)
+        callbacks.append(EmbeddingEnergyCallback.for_task(task, every=cfg.metrics_every))
 
     if args.resume:
         resume_path = Path(args.resume)
         if not resume_path.is_absolute():
             resume_path = (REPO_ROOT / resume_path).resolve()
-        result = resume(cfg, resume_path, additional_epochs=cfg.num_epochs)
+        result = resume(cfg, resume_path, additional_epochs=cfg.num_epochs, callbacks=callbacks)
     else:
         import time
 
         tag = args.tag or f"{cfg.task}_{int(time.time())}"
         run_dir = exp_dir / "runs" / tag
-        result = train(cfg, run_dir=run_dir)
+        result = train(cfg, run_dir=run_dir, callbacks=callbacks)
 
     print(f"\nrun_dir={result['run_dir']}")
     return result
