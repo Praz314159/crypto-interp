@@ -5,10 +5,11 @@ analyses are method calls rather than 4-argument function calls. It does not
 add new logic; every method dispatches to an existing canonical function in
 ``crypto_interp.interp`` (or ``crypto_interp.analysis``).
 
-Two lazy properties — ``cache`` (the full ``p²`` :class:`ActivationCache`) and
-``logits_grid`` — are built on first access and reused, so an analysis that
-runs several queries against the same forward pass pays the forward cost
-once.
+Two lazy properties are built on first access and reused, so an analysis that
+runs several queries against the same forward pass pays the forward cost once:
+``cache`` (an :class:`ActivationCache` over the full p² grid; ``cache.grid(name,
+units=True)`` gives its units view) and ``logits_grid`` (logits over the
+(p-1)² units grid). See :mod:`crypto_interp.interp.grids` for the two grids.
 
 Construction::
 
@@ -84,7 +85,7 @@ class Session:
 
     @property
     def logits_grid(self) -> torch.Tensor:
-        """``(p-1, p-1, vocab)`` answer-position logits over the (a, b) grid."""
+        """``(p-1, p-1, vocab)`` final-position logits over the units grid (float64)."""
         if self._logits_grid is None:
             from .grids import compute_logits_grid
 
