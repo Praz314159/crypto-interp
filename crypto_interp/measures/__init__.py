@@ -12,7 +12,37 @@
 See :mod:`crypto_interp.measures.core` for the framework.
 """
 
+from .clock import (
+    ClockDefect,
+    ClockRepair,
+    ClockResiduals,
+    clock_defect,
+    clock_repair,
+    clock_residuals,
+    token_table,
+)
 from .core import REGISTRY, Measure, measure
+from .errors import ErrorProfile, errors
 from .kernel import REGIMES, KernelNoise, kernel_noise
+from .noise import NOISE_CLASSES, NoiseModes, noise_modes
 
-__all__ = ["REGIMES", "REGISTRY", "KernelNoise", "Measure", "kernel_noise", "measure"]
+__all__ = [
+    "NOISE_CLASSES",
+    "REGIMES",
+    "REGISTRY",
+    "ClockDefect",
+    "ClockRepair",
+    "ClockResiduals",
+    "ErrorProfile",
+    "KernelNoise",
+    "Measure",
+    "NoiseModes",
+    "clock_defect",
+    "clock_repair",
+    "clock_residuals",
+    "errors",
+    "kernel_noise",
+    "measure",
+    "noise_modes",
+    "token_table",
+]

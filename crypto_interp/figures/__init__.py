@@ -1,5 +1,5 @@
-"""Figures: plotting functions over measure tables. They compute nothing from models."""
+"""Figures: plotting functions over measure tables and results. They compute nothing from models."""
 
-from . import kernel
+from . import clock, errors, kernel, noise
 
-__all__ = ["kernel"]
+__all__ = ["clock", "errors", "kernel", "noise"]
