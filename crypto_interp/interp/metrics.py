@@ -107,10 +107,12 @@ class EmbeddingEnergyCallback:
 
     @classmethod
     def for_task(cls, task, every: int) -> EmbeddingEnergyCallback:
-        if task.task != "mul":
+        from ..data import MULTIPLICATIVE_TASKS
+
+        if task.task not in MULTIPLICATIVE_TASKS:
             raise ValueError(
                 f"no character basis for embedding-energy tracking on task {task.task!r} "
-                "(only 'mul'); set metrics_every=0"
+                f"(only {sorted(MULTIPLICATIVE_TASKS)}); set metrics_every=0"
             )
         return cls(task.p, every)
 

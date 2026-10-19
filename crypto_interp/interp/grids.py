@@ -11,6 +11,10 @@ Every analysis works on one of two orderings of the value-token pairs (a, b):
 ``full_grid_inputs`` / ``units_grid_inputs`` build the token tensors,
 ``as_full_grid`` reshapes a flat full-grid tensor to (p, p, ...), and
 ``to_units`` takes the units view of a full-grid tensor (flat or 2-D).
+
+A dataset need not cover the full grid (``mul_units`` covers only the units),
+so per-example masks such as ``ds.test_mask`` are placed on the units grid by
+their (a, b) coordinates with :func:`units_mask`, not by reshaping.
 """
 
 from __future__ import annotations
@@ -30,6 +34,17 @@ def full_grid_inputs(ds) -> torch.Tensor:
 def units_grid_inputs(ds) -> torch.Tensor:
     """All (a, b, '=') triples for a, b in 1..p-1, lexicographic. Shape ((p-1)², 3)."""
     return to_units(full_grid_inputs(ds), ds.p).reshape(-1, 3)
+
+
+def units_mask(ds, mask: torch.Tensor) -> torch.Tensor:
+    """A per-example mask of ``ds`` (e.g. ``ds.test_mask``) as a (p-1, p-1) bool
+    grid over the units. Pairs the dataset lacks, or that involve 0, are False."""
+    p = ds.p
+    out = torch.zeros(p - 1, p - 1, dtype=torch.bool)
+    a, b = ds.inputs[:, 0], ds.inputs[:, 1]
+    keep = mask.bool().cpu() & (a > 0) & (b > 0)
+    out[a[keep] - 1, b[keep] - 1] = True
+    return out
 
 
 def as_full_grid(t: torch.Tensor, p: int) -> torch.Tensor:

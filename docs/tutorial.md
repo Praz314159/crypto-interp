@@ -29,6 +29,7 @@ CONFIG = ExperimentConfig(
 ```
 
 `crypto_interp.data.available_tasks()` lists the tasks: `add`, `mul`,
+`mul_units` (multiplication on {1..p−1}² only, without 0) and
 `sqrt_of_product`.
 
 ## 2. Train one run

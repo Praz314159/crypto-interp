@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Pod-side setup: clone the repo, install, and launch the trajectory sweep
-# in a detached tmux session. Run this once on a fresh RunPod GPU pod:
+# Pod-side setup: clone the repo, install, and launch a sweep script in a
+# detached tmux session. Run this once on a fresh RunPod GPU pod:
 #
 #     curl -fsSL https://raw.githubusercontent.com/Praz314159/crypto-interp/main/infra/runpod/bootstrap.sh | bash
 #
@@ -11,11 +11,15 @@
 #     REPO_URL    git URL to clone        (default: the public repo)
 #     WORKDIR     where to clone          (default: /workspace)
 #     N_PARALLEL  concurrent training processes sharing the GPU (default: 4)
+#     SWEEP       sweep script under infra/runpod/ (default: trajectory_sweep.sh)
+#     SWEEP_ARGS  extra arguments for it, after N_PARALLEL (e.g. a seed range)
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Praz314159/crypto-interp.git}"
 WORKDIR="${WORKDIR:-/workspace}"
 N_PARALLEL="${N_PARALLEL:-4}"
+SWEEP="${SWEEP:-trajectory_sweep.sh}"
+SWEEP_ARGS="${SWEEP_ARGS:-}"
 
 command -v tmux >/dev/null || apt-get install -y -q tmux
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
@@ -34,6 +38,6 @@ if tmux has-session -t sweep 2>/dev/null; then
 fi
 
 tmux new-session -d -s sweep \
-    "DEVICE=$DEVICE infra/runpod/trajectory_sweep.sh $N_PARALLEL 2>&1 | tee $WORKDIR/sweep.log"
-echo "sweep launched (DEVICE=$DEVICE, N_PARALLEL=$N_PARALLEL)"
+    "DEVICE=$DEVICE infra/runpod/$SWEEP $N_PARALLEL $SWEEP_ARGS 2>&1 | tee $WORKDIR/sweep.log"
+echo "sweep launched ($SWEEP, DEVICE=$DEVICE, N_PARALLEL=$N_PARALLEL)"
 echo "follow progress:  tmux attach -t sweep    or    tail -f $WORKDIR/sweep.log"

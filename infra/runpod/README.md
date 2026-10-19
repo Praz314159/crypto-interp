@@ -41,6 +41,8 @@ rsync -az --relative experiments/./004_p127/runs experiments/./005_p181/runs \
 
 # 2. Bootstrap + launch (clones repo, installs, starts tmux session 'sweep'):
 ssh "$POD" 'bash -s' < infra/runpod/bootstrap.sh
+#    Another sweep script: SWEEP=dlc_sweep.sh (experiment 007), e.g.
+#    ssh "$POD" "SWEEP=dlc_sweep.sh N_PARALLEL=6 bash -s" < infra/runpod/bootstrap.sh
 
 # 3. Monitor:
 ssh "$POD" tail -f /workspace/sweep.log
