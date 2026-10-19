@@ -115,3 +115,43 @@ def test_character_figures_render(S):
     ):
         assert fig.axes
         matplotlib.pyplot.close(fig)
+
+
+def test_population_and_theory_figures_render():
+    from crypto_interp.figures import populations as pf
+    from crypto_interp.figures import theory as tf
+    from crypto_interp.measures.dynamics import DynamicsMarkers
+
+    lat = pd.DataFrame(
+        [
+            {"p": p, "regime": r, "K": (3, 10), "helper_mult": (2,)}
+            for p in (113, 127)
+            for r in ("grokked", "CRT-fail")
+        ]
+    )
+    dm = pd.DataFrame(
+        [
+            {"d_mlp": d, "status": s, "K": (3, 10), "cliff_epoch": 100 * d}
+            for d in (16, 32)
+            for s in ("grokked", "no-fit")
+        ]
+    )
+    dyn = pd.DataFrame(
+        [
+            {"K_class": c, "bifurcation_epoch": 100, "cliff_epoch": 900, "ratio_at": 5.0}
+            for c in ("primitive", "mixed")
+        ]
+    )
+    marker = DynamicsMarkers(
+        (3,), "primitive", 900, 100, 200, None, 5.0, np.arange(0, 1000, 100), np.linspace(1, 50, 10)
+    )
+    fvu = {"widths": [1, 2], "primary": [0.5, 0.2], "helper": [0.3, 0.05]}
+    for fig in (
+        pf.lattice(lat),
+        pf.by_d_mlp(dm),
+        pf.cliff_vs_bifurcation(dyn),
+        pf.bifurcation_overlay({1: marker}),
+        tf.helper_fvu(fvu, 10),
+    ):
+        assert fig.axes
+        matplotlib.pyplot.close(fig)
