@@ -9,7 +9,9 @@ The JSON file holds the result's non-array fields plus a ``_key`` block:
 measure name and version, parameters, and the checkpoint's SHA-256 with the
 file size and mtime it was computed at. An entry is used only if the
 checkpoint still hashes the same (the hash is recomputed only when size or
-mtime changed), so rewriting a checkpoint invalidates its results.
+mtime changed), so rewriting a checkpoint invalidates its results. An entry
+whose fields differ from the result type's (written by an earlier form of the
+measure under the same version) is also a miss, and is overwritten.
 """
 
 from __future__ import annotations
@@ -77,6 +79,8 @@ class Store:
             dict(np.load(base.with_suffix(".npz"))) if base.with_suffix(".npz").exists() else {}
         )
         fields = {**meta, **arrays}
+        if set(fields) != {f.name for f in dataclasses.fields(rtype)}:
+            return None  # stale: written by an earlier form of the result type
         for f in dataclasses.fields(rtype):
             if isinstance(fields.get(f.name), list):
                 fields[f.name] = tuple(fields[f.name])
