@@ -21,18 +21,18 @@ def _cfg(**kw):
 
 def test_train_writes_schema_2_and_resume_continues_exactly(tmp_path):
     run = tmp_path / "run"
-    train(_cfg(), run, tmp_path / "datasets")
+    train(_cfg(), run)
 
     ckpts = checkpoint_paths(run)
     assert [load_checkpoint(c).epoch for c in ckpts] == [0, 10, 19]
     last = load_checkpoint(ckpts[-1])
     assert last.source_schema == 2 and len(last.train_losses) == 20
 
-    resume(_cfg(), ckpts[-1], additional_epochs=5, datasets_dir=tmp_path / "datasets")
+    resume(_cfg(), ckpts[-1], additional_epochs=5)
     resumed = load_checkpoint(checkpoint_paths(run)[-1])
 
     straight = tmp_path / "straight"
-    train(_cfg(num_epochs=25), straight, tmp_path / "datasets")
+    train(_cfg(num_epochs=25), straight)
     reference = load_checkpoint(checkpoint_paths(straight)[-1])
 
     assert resumed.epoch == reference.epoch == 24

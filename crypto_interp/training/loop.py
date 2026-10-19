@@ -142,17 +142,12 @@ def _save_checkpoint(
 # ----------------------------- public API -----------------------------
 
 
-def train(
-    cfg: ExperimentConfig,
-    run_dir: Path,
-    datasets_dir: Path,
-) -> dict:
+def train(cfg: ExperimentConfig, run_dir: Path) -> dict:
     """Train a fresh model under ``cfg`` and write artifacts to ``run_dir``.
 
     Returns the final (train_loss, test_loss) as a dict for convenience.
     """
     run_dir = Path(run_dir)
-    datasets_dir = Path(datasets_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     torch.manual_seed(cfg.seed)
@@ -168,7 +163,7 @@ def train(
         )
 
     task = TaskSpec(task=cfg.task, p=cfg.p, frac_train=cfg.frac_train, seed=cfg.seed)
-    ds = task.build(cache_dir=datasets_dir)
+    ds = task.build()
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)
@@ -302,12 +297,7 @@ def train(
     }
 
 
-def resume(
-    cfg: ExperimentConfig,
-    resume_ckpt: Path,
-    additional_epochs: int,
-    datasets_dir: Path,
-) -> dict:
+def resume(cfg: ExperimentConfig, resume_ckpt: Path, additional_epochs: int) -> dict:
     """Continue training from a checkpoint, appending to losses/metrics in place.
 
     The run_dir is inferred from the checkpoint's parent directory. ``cfg`` is
@@ -316,7 +306,6 @@ def resume(
     """
     resume_ckpt = Path(resume_ckpt)
     run_dir = resume_ckpt.parent
-    datasets_dir = Path(datasets_dir)
 
     print(f"Resuming from {resume_ckpt}")
     device = pick_device(cfg.device)
@@ -327,7 +316,7 @@ def resume(
     rckpt = load_checkpoint(resume_ckpt, map_location=device)
     saved_cfg = rckpt.train_config
     task = rckpt.task
-    ds = task.build(cache_dir=datasets_dir)
+    ds = task.build()
     inputs = ds.inputs.to(device)
     labels = ds.labels.to(device)
     train_mask = ds.train_mask.to(device)

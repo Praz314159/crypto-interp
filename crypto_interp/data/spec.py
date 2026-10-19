@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
 
 from .base import Dataset
 
@@ -24,16 +23,9 @@ class TaskSpec:
     def to_dict(self) -> dict:
         return asdict(self)
 
-    def build(self, cache_dir: str | Path | None = None) -> Dataset:
-        """Build the dataset, reading/writing ``cache_dir`` if one is given."""
-        from . import build, load_or_build
+    def build(self) -> Dataset:
+        """Build the dataset. Deterministic in the spec and fast (0.2 s at p = 181),
+        so datasets are never cached to disk."""
+        from . import build
 
-        if cache_dir is None:
-            return build(task=self.task, p=self.p, frac_train=self.frac_train, seed=self.seed)
-        return load_or_build(
-            cache_dir=cache_dir,
-            task=self.task,
-            p=self.p,
-            frac_train=self.frac_train,
-            seed=self.seed,
-        )
+        return build(task=self.task, p=self.p, frac_train=self.frac_train, seed=self.seed)

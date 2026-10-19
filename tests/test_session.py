@@ -29,6 +29,6 @@ def test_session_from_run_accepts_a_run_or_a_directory(tmp_path):
         save_every=5,
         log_every=1000,
     )
-    train(cfg, path, tmp_path / "exp" / "datasets")
+    train(cfg, path)
     a, b = Session.from_run(Run.open(path)), Session.from_run(path)
     assert a.ds.p == b.ds.p == 7

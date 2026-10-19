@@ -3,7 +3,6 @@
 from . import add, mul  # avoid shadowing math.sqrt elsewhere
 from . import sqrt as sqrt_mod
 from .base import Dataset
-from .io import cache_path, load, load_or_build, save
 from .spec import TaskSpec
 
 _TASKS = {
@@ -28,8 +27,4 @@ __all__ = [
     "TaskSpec",
     "build",
     "available_tasks",
-    "load_or_build",
-    "save",
-    "load",
-    "cache_path",
 ]

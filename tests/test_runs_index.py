@@ -19,7 +19,7 @@ def _train(root, experiment, name, **kw):
         log_every=1000,
     )
     path = root / experiment / "runs" / name
-    train(ExperimentConfig(**{**cfg, **kw}), path, root / experiment / "datasets")
+    train(ExperimentConfig(**{**cfg, **kw}), path)
     return path
 
 

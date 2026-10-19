@@ -133,7 +133,6 @@ def main():
         cfg = replace(cfg, **overrides)
 
     exp_dir = REPO_ROOT / "experiments" / args.experiment
-    datasets_dir = exp_dir / "datasets"
 
     # Import inside main so --help doesn't pull in torch.
     from crypto_interp.training import resume, train
@@ -142,15 +141,13 @@ def main():
         resume_path = Path(args.resume)
         if not resume_path.is_absolute():
             resume_path = (REPO_ROOT / resume_path).resolve()
-        result = resume(
-            cfg, resume_path, additional_epochs=cfg.num_epochs, datasets_dir=datasets_dir
-        )
+        result = resume(cfg, resume_path, additional_epochs=cfg.num_epochs)
     else:
         import time
 
         tag = args.tag or f"{cfg.task}_{int(time.time())}"
         run_dir = exp_dir / "runs" / tag
-        result = train(cfg, run_dir=run_dir, datasets_dir=datasets_dir)
+        result = train(cfg, run_dir=run_dir)
 
     print(f"\nrun_dir={result['run_dir']}")
     return result
