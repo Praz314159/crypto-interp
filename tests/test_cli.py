@@ -58,7 +58,7 @@ def test_sweep_then_measure_and_figure(root, tmp_path, capsys):
     main(sweep + ["--skip-existing"])
     assert capsys.readouterr().out.count("(finished)") == 4
 
-    out = tmp_path / "status.csv"
+    out = tmp_path / "tables" / "status.csv"  # parent directories are created
     main(["measure", "grok_status", "--root", str(root), "--where", "d_mlp=8", "--out", str(out)])
     assert set(pd.read_csv(out)["seed"]) == {1, 2}
 

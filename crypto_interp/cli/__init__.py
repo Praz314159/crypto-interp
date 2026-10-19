@@ -33,7 +33,9 @@ def _measure_main(args) -> None:
         table = m.over(pop, checkpoints=args.checkpoints, **params)
     if args.out is None:
         print(table.to_string())
-    elif args.out.suffix == ".parquet":
+        return
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    if args.out.suffix == ".parquet":
         table.to_parquet(args.out)
     else:
         table.to_csv(args.out, index=False)
