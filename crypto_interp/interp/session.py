@@ -41,9 +41,14 @@ class Session:
         self.ds = ds
         self.task = task or getattr(ds, "task", "mul")
         if basis is None or ci is None:
+            # The default is the multiplicative-character basis on (Z/p)*, which is
+            # only the right basis for ``mul``. Analysing another task in it gives
+            # plausible-looking but meaningless numbers, so refuse.
+            if self.task != "mul":
+                raise ValueError(
+                    f"Session has no default basis for task {self.task!r} (only 'mul'); "
+                    "pass basis= and ci= explicitly")
             from .bases import char_index
-            # v1: both ``add`` and ``mul`` use the multiplicative-Fourier basis on (Z/p)*
-            # for analysis; v2 will dispatch on task when ``modular_add`` is added.
             basis, ci = char_index(ds.p)
         self.basis = basis
         self.ci = ci
