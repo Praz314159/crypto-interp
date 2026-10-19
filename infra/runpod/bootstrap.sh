@@ -34,6 +34,6 @@ if tmux has-session -t sweep 2>/dev/null; then
 fi
 
 tmux new-session -d -s sweep \
-    "DEVICE=$DEVICE scripts/local_trajectory_sweep.sh $N_PARALLEL 2>&1 | tee $WORKDIR/sweep.log"
+    "DEVICE=$DEVICE infra/runpod/trajectory_sweep.sh $N_PARALLEL 2>&1 | tee $WORKDIR/sweep.log"
 echo "sweep launched (DEVICE=$DEVICE, N_PARALLEL=$N_PARALLEL)"
 echo "follow progress:  tmux attach -t sweep    or    tail -f $WORKDIR/sweep.log"
