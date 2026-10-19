@@ -1,7 +1,4 @@
-"""Package layering: lower layers must not import higher ones.
-
-models, data  <-  training, runs  <-  interp  <-  analysis
-"""
+"""Package layering: lower layers must not import higher ones (see docs/library.md)."""
 
 import ast
 from pathlib import Path
