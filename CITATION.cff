@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "crypto-interp: mechanistic interpretability of number-theoretic algorithms learned by small transformers"
+authors:
+  - family-names: Ramakrishna
+    given-names: Prashanth
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/Praz314159/crypto-interp"
+keywords:
+  - mechanistic interpretability
+  - grokking
+  - modular arithmetic
+  - Dirichlet characters
