@@ -52,6 +52,18 @@ def test_query_by_experiment_prefix_and_config_fields(root):
     assert len(runs.query(root, no_such_field=1)) == 0
 
 
+def test_runs_sort_numbers_numerically():
+    from crypto_interp.runs.index import _natural_key
+
+    ids = ["e/x_seed10", "e/x_seed2", "e/x_seed1"]
+    fake = [type("R", (), {"id": i})() for i in ids]
+    assert [r.id for r in sorted(fake, key=_natural_key)] == [
+        "e/x_seed1",
+        "e/x_seed2",
+        "e/x_seed10",
+    ]
+
+
 def test_table_and_loading(root):
     pop = runs.query(root, experiment="001")
     table = pop.table()
@@ -68,3 +80,4 @@ def test_old_manifest_is_read_through(tmp_path):
     run_dir = _train(tmp_path, "003_old", "x_seed0")
     (run_dir / "manifest.json").write_text(json.dumps({"backfilled": True, "config": {"seed": 99}}))
     assert runs.Run.open(run_dir).task.seed == 0
+

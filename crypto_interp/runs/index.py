@@ -19,6 +19,7 @@ left out unless asked for.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -101,11 +102,16 @@ def _matches(value: Any, want: Filter) -> bool:
     return value == want
 
 
+def _natural_key(run: Run) -> list:
+    """Sort key that orders ``seed2`` before ``seed10``."""
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", run.id)]
+
+
 class RunSet(Sequence[Run]):
-    """An ordered collection of runs (sorted by id)."""
+    """An ordered collection of runs (by id, with numbers in numeric order)."""
 
     def __init__(self, runs: Sequence[Run]):
-        self._runs = sorted(runs, key=lambda r: r.id)
+        self._runs = sorted(runs, key=_natural_key)
 
     def __getitem__(self, i):
         return RunSet(self._runs[i]) if isinstance(i, slice) else self._runs[i]
