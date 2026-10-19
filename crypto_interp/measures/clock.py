@@ -1,6 +1,6 @@
 """Embedding clock geometry: how far each token sits from its ideal clock position.
 
-For each essential character χ_k, the embedding of token x should lie on a
+For each character χ_k in K, the embedding of token x should lie on a
 clock: ``W_E[:, x] ≈ Σ_k C_k cos θ_k(x) + S_k sin θ_k(x)`` with
 ``θ_k(x) = 2πk·dlog(x)/(p−1)``. :func:`fit_clock` fits the C_k, S_k by least
 squares over the tokens. That is the run's own clock, so a perfect clock scores
@@ -74,7 +74,9 @@ def fit_clock(W_E: np.ndarray, K, p: int) -> ClockFit:
 
 
 def _session_fit(S, K):
-    K = S.essential()["K"] if K is None else K
+    from .characters import support
+
+    K = support(S, K)
     return fit_clock(S.model.embed.W_E.detach().double().cpu().numpy(), K, S.ds.p)
 
 
@@ -96,7 +98,7 @@ class ClockResiduals:
 @measure("clock_residuals", version=1)
 def clock_residuals(S, K=None) -> ClockResiduals:
     """Per-token deviation of the embedding from its fitted clock geometry.
-    ``K`` defaults to the ablation-essential characters."""
+    ``K`` defaults to the energy support (see :func:`.characters.energy_support`)."""
     fit = _session_fit(S, K)
     ideal = fit.ideal
     Q, _ = np.linalg.qr(np.concatenate([fit.C, fit.S]).T)  # span of all clock planes
