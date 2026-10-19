@@ -90,16 +90,16 @@ def per_neuron_dominant_char(
 
 def cluster_signal(model, ds, cluster_neurons, W_U_k: torch.Tensor) -> np.ndarray:
     """Cluster's projection onto the unembed's character-k direction over the
-    full (a, b) grid. Returns ``(p-1, p-1)``.
+    units grid. Returns ``(p-1, p-1)``.
 
     Reconstructs what the cluster of neurons contributes to the residual stream
     along the direction the unembed reads as χ_k. Comparing this to
     :func:`reference_cos_signal` is the mechanism-verification recipe.
     """
+    from .grids import units_grid_inputs
+
     p = ds.p
-    aa, bb = torch.meshgrid(torch.arange(1, p), torch.arange(1, p), indexing="ij")
-    eq = torch.full_like(aa, ds.eq_token)
-    inputs = torch.stack([aa, bb, eq], dim=-1).reshape(-1, 3)
+    inputs = units_grid_inputs(ds)
     cache: dict[str, torch.Tensor] = {}
     model.remove_all_hooks()
     model.cache_all(cache)

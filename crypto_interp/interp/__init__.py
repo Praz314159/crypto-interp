@@ -25,7 +25,14 @@ from .bases import (
 )
 from .cache import ActivationCache
 from .dynamics import bifurcation_step, cliff_step, commit_step, grokking_status
-from .grids import ab_grid_inputs, compute_activation_grid, compute_logits_grid
+from .grids import (
+    as_full_grid,
+    compute_activation_grid,
+    compute_logits_grid,
+    full_grid_inputs,
+    to_units,
+    units_grid_inputs,
+)
 from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs, helper_multiplier
 from .hooks import hooks, patch_hook, project_hook, run_with_hooks, zero_hook
 from .interventions import ablate_char_w, freeze_param, weight_patch
@@ -108,7 +115,10 @@ __all__ = [
     "find_cliff",
     "topk_recall",
     # grids
-    "ab_grid_inputs",
+    "as_full_grid",
+    "full_grid_inputs",
+    "to_units",
+    "units_grid_inputs",
     "compute_logits_grid",
     "compute_activation_grid",
     # reductions

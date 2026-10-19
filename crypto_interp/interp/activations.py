@@ -15,11 +15,11 @@ Two verbs:
 
 from __future__ import annotations
 
-import einops
 import torch
 
 from ..data.base import Dataset
 from .cache import ActivationCache
+from .grids import as_full_grid, full_grid_inputs
 
 
 @torch.no_grad()
@@ -51,12 +51,7 @@ def cache_all(model, ds: Dataset) -> ActivationCache:
     - Sets the cache's ``p`` so ``cache.grid(name)`` works without args.
     """
     p = ds.p
-    eq = ds.eq_token
-    all_inputs = torch.tensor(
-        [(a, b, eq) for a in range(p) for b in range(p)],
-        dtype=torch.long,
-        device=next(model.parameters()).device,
-    )
+    all_inputs = full_grid_inputs(ds).to(next(model.parameters()).device)
     logits, cache = run_with_cache(model, all_inputs)
     cache._put("logits", logits)
     cache._put("logits_final", logits[:, -1, : ds.n_answer_tokens])
@@ -66,8 +61,8 @@ def cache_all(model, ds: Dataset) -> ActivationCache:
 
 
 def reshape_pp(tensor: torch.Tensor, p: int) -> torch.Tensor:
-    """Reshape a ``(p², ...)`` tensor to ``(p, p, ...)`` assuming lexicographic (a, b)."""
-    return einops.rearrange(tensor, "(a b) ... -> a b ...", a=p, b=p)
+    """Reshape a ``(p², ...)`` tensor to ``(p, p, ...)``; see :func:`grids.as_full_grid`."""
+    return as_full_grid(tensor, p)
 
 
 def summary(cache) -> None:

@@ -11,7 +11,8 @@ ergonomic accessors:
   multi-block model the bare short name is ambiguous and raises ``KeyError``.
 - ``cache.final(name)`` — the final-position slice ``t[..., -1, :]``.
 - ``cache.grid(name)`` — reshape the ``(p², ...)`` first dim to ``(p, p, ...)``
-  for value-token (a, b) grid analyses.
+  for value-token (a, b) grid analyses; ``units=True`` gives the (p-1, p-1)
+  units view (see :mod:`crypto_interp.interp.grids`).
 - ``cache.decompose_resid()`` — return the {resid_pre, attn_out, mlp_out}
   triple that sums to the post-block residual (1-block models only).
 
@@ -24,7 +25,6 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, Union
 
-import einops
 import torch
 from jaxtyping import Float
 
@@ -133,17 +133,19 @@ class ActivationCache:
         # patterns it's [..., -1, :]. Both behave the same for our use.
         return t[..., -1, :]
 
-    def grid(self, key: HookKey, p: int | None = None) -> Float[torch.Tensor, "p p ..."]:
-        """Reshape ``(p², ...)`` → ``(p, p, ...)`` over value-token (a, b) inputs.
+    def grid(self, key: HookKey, p: int | None = None, units: bool = False):
+        """Reshape the full-grid ``(p², ...)`` first dim to ``(p, p, ...)`` over (a, b).
 
-        Requires p (passed at construction or here).
+        ``units=True`` returns the (p-1, p-1, ...) units view (a, b != 0), the same
+        grid as :func:`crypto_interp.interp.grids.compute_logits_grid`. Requires p
+        (passed at construction or here).
         """
+        from .grids import as_full_grid, to_units
+
         p = p or self._p
         if p is None:
-            raise ValueError(
-                "grid() requires p (pass at construction via run_with_cache+ds, or here)"
-            )
-        return einops.rearrange(self[key], "(a b) ... -> a b ...", a=p, b=p)
+            raise ValueError("grid() requires p (pass at construction via cache_all, or here)")
+        return to_units(self[key], p) if units else as_full_grid(self[key], p)
 
     def decompose_resid(self) -> dict[str, torch.Tensor]:
         """Per-component contributions to the residual stream (1-block model).
