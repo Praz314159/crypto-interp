@@ -1,4 +1,4 @@
-"""Runs on disk: checkpoints and (later) the run index."""
+"""Runs on disk: checkpoints, manifests and the run index."""
 
 from .checkpoint import (
     SCHEMA_VERSION,
@@ -8,12 +8,21 @@ from .checkpoint import (
     load_checkpoint,
     save_checkpoint,
 )
+from .index import Run, RunSet, discover, query
+from .manifest import read_manifest, rebuild_manifest, write_manifest
 
 __all__ = [
     "SCHEMA_VERSION",
     "Checkpoint",
+    "Run",
+    "RunSet",
     "checkpoint_epoch",
     "checkpoint_paths",
+    "discover",
     "load_checkpoint",
+    "query",
+    "read_manifest",
+    "rebuild_manifest",
     "save_checkpoint",
+    "write_manifest",
 ]

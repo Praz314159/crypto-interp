@@ -62,10 +62,12 @@ class Session:
     # ---------- constructors ----------
 
     @classmethod
-    def from_run(cls, run_dir, device: str = "cpu") -> "Session":
-        """Load model + dataset from a run directory; build basis/char_index from ds.p."""
+    def from_run(cls, run, device: str = "cpu") -> "Session":
+        """Load the latest checkpoint of ``run`` (a :class:`~crypto_interp.runs.Run` or a
+        run directory); build basis/char_index from ds.p."""
         from .load import latest_checkpoint, load_run
 
+        run_dir = getattr(run, "path", run)
         model, ds, _ = load_run(latest_checkpoint(run_dir), device=device)
         return cls(model, ds)
 

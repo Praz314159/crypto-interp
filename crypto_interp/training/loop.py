@@ -9,7 +9,6 @@ float64 cross-entropy.
 from __future__ import annotations
 
 import datetime
-import json
 import socket
 import subprocess
 import time
@@ -24,13 +23,16 @@ from ..data import TaskSpec
 from ..interp.metrics import EmbeddingEnergyTracker
 from ..models import Transformer, TransformerConfig
 from ..runs.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
+from ..runs.manifest import make_manifest, write_manifest
 from .config import ExperimentConfig
 
 # ----------------------------- helpers -----------------------------
 
 
-def _write_manifest(run_dir: Path, cfg: ExperimentConfig, device) -> None:
-    """Record run provenance so it never has to be reconstructed from mtimes."""
+def _write_manifest(
+    run_dir: Path, task: TaskSpec, model_cfg, cfg: ExperimentConfig, device
+) -> None:
+    """Record what the run is and where it ran, so neither is reconstructed later."""
     try:
         git_sha = (
             subprocess.run(
@@ -43,14 +45,15 @@ def _write_manifest(run_dir: Path, cfg: ExperimentConfig, device) -> None:
         )
     except Exception:
         git_sha = None
-    manifest = {
-        "config": cfg.to_checkpoint_dict(),
+    provenance = {
         "device": str(device),
         "hostname": socket.gethostname(),
         "git_sha": git_sha,
         "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
-    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
+    write_manifest(
+        run_dir, make_manifest(task, model_cfg, cfg.to_checkpoint_dict(), provenance=provenance)
+    )
 
 
 def cross_entropy_high_precision(
@@ -156,7 +159,6 @@ def train(
     np.random.seed(cfg.seed)
 
     device = pick_device(cfg.device)
-    _write_manifest(run_dir, cfg, device)
     use_float64 = device.type != "mps"
     print(f"Device: {device}, high-precision (float64) loss: {use_float64}")
     if not use_float64:
@@ -178,6 +180,7 @@ def train(
 
     model_cfg = TransformerConfig.from_dict({**cfg.to_checkpoint_dict(), "d_vocab": ds.vocab_size})
     model = Transformer(model_cfg).to(device)
+    _write_manifest(run_dir, task, model_cfg, cfg, device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {n_params:,}")
 
