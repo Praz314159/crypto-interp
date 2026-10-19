@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+__CSS__</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Mechanistic interpretability · live model dissection</div>
+  <h1>Watch a transformer multiply</h1>
+  <p class="lede">A 1-layer transformer trained on
+  <b>a × b mod __P__</b> doesn't memorize — it invents an algorithm:
+  represent every number as angles on a handful of clocks, <b>rotate</b> to
+  multiply, and let the clocks vote on the answer. The trained model is
+  embedded in this page and runs <b>live in your browser</b>; every figure
+  below is a real forward pass, recomputed as you change
+  <span class="tok a">a</span> and <span class="tok b">b</span>.</p>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="controls">
+  <div class="knob"><span class="sym a">a</span>
+    <input id="in-a" type="number" min="1">
+    <input id="sl-a" type="range" min="1"></div>
+  <div class="knob"><span class="sym b">b</span>
+    <input id="in-b" type="number" min="1">
+    <input id="sl-b" type="range" min="1"></div>
+  <button class="primary" id="play">▶ replay walkthrough</button>
+  <button id="step" title="multiply b by the primitive root g — the algorithm's unit step">b ← g·b</button>
+  <span class="result" id="result"></span>
+  <span class="badge" id="badge">checking forward pass…</span>
+</div>
+
+<section class="stage">
+  <h2><span class="num">1</span>Look up the angles</h2>
+  <p class="exp">The embedding stores every token as a position on
+  <b>__NK__ clocks</b> — one per character χ<sub>k</sub> the model learned to
+  use. Token x sits at angle θ<sub>k</sub>(x) = 2πk·dlog(x)/(p−1), where dlog
+  is the discrete logarithm base g=__G__. Each circle below is the actual
+  embedding matrix W<sub>E</sub> projected onto one character's plane; gray
+  dots are all p−1 tokens. The model "reads" <b style="color:var(--col-a)">a</b>
+  and <b style="color:var(--col-b)">b</b> by looking up their hands.</p>
+  <div class="clock-grid" id="row-lookup"></div>
+  <div class="dyn" id="dyn-lookup"></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">2</span>Add the angles — this is the multiplication</h2>
+  <p class="exp">Multiplying numbers is <b>adding their discrete logs</b>, and
+  adding logs is <b>rotating a clock hand</b>. Watch the
+  <b style="color:var(--col-ans)">green hand</b> start at a's angle and rotate
+  by b's angle: it lands exactly on the gray dot where the embedding stores
+  a·b — on every clock at once. A <b>helper</b> character χ<sub>2m</sub> is
+  the same motion at double speed: it reuses χ<sub>m</sub>'s machinery and
+  costs the model nothing extra (the dashed green hand is the primary's angle
+  doubled — it coincides with the helper's own hand).</p>
+  <div class="clock-grid" id="row-add"></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">3</span>Neuron clusters detect the summed angle</h2>
+  <p class="exp">In the MLP, each <b>primary</b> character owns a small
+  cluster of ReLU neurons, each tuned to a preferred phase — its position
+  around the circle below. Bar length is that neuron's <b>actual activation
+  on this forward pass</b>. The active bump always points at
+  θ<sub>k</sub>(a)+θ<sub>k</sub>(b) (red line; the dashed mirror exists
+  because a real cos/sin basis cannot tell k from −k). Helper characters have
+  <b>zero neurons of their own</b> — the ReLU's second harmonic produces their
+  signal from the primary's bump for free.</p>
+  <div class="clock-grid" id="row-cluster"></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">4</span>Each character votes for a coset — the CRT step</h2>
+  <p class="exp">One clock cannot name the answer. Character χ<sub>k</sub>
+  only measures angles at frequency k, so every candidate c with the same
+  k·dlog(c) looks identical to it: exactly <b>gcd(k, p−1) candidates</b>
+  survive each character's vote (colored cells below; candidates ordered by
+  dlog). The algorithm works because the surviving sets of different
+  characters <b>intersect in a single candidate</b> — the model's
+  approximate Chinese-Remainder argument. This is why it must learn several
+  characters whose frequencies jointly cover p−1, and why a seed whose K
+  fails to cover (like the CRT-failure regime) cannot reach zero loss.</p>
+  <div id="coset-box"><canvas id="cosets"></canvas></div>
+</section>
+
+<section class="stage">
+  <h2><span class="num">5</span>Interference turns votes into logits</h2>
+  <p class="exp">The unembed converts each character's vote into a cosine
+  wave over all candidates: peaks on the character's surviving coset. The
+  waves are individually ambiguous, but their <b>sum spikes only at
+  c = a·b</b> — constructive interference exactly where every character
+  agrees. <span class="legend"><span class="swatch" style="background:#999"></span>actual
+  model logits <span class="swatch" style="background:#000"></span>sum of the K
+  character waves <span class="swatch" style="background:var(--col-ans)"></span>true
+  answer</span></p>
+  <div id="wave-box"><canvas id="waves"></canvas></div>
+</section>
+
+<footer id="foot"></footer>
+
+</div>
+<div id="tip"></div>
+<script>
+__JS__</script>
+</body>
+</html>
