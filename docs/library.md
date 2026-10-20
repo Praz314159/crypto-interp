@@ -84,13 +84,34 @@ Activation names follow TransformerLens (`blocks.0.mlp.hook_post`), and short
 names work too: `mlp_post`, `mlp_out`, `attn_attn` (the attention pattern),
 `resid_mid` and so on.
 
-## Characters and bases
+## The group and its characters
 
-`interp.char_index(p)` returns the real multiplicative Fourier basis for
-(ℤ/p)*, a (p, p) matrix with a cosine and a sine row per character, and a
-`CharIndex` from k to its rows (`ci.cos[k]`, `ci.sin[k]`). `interp.discrete_log_table(p)` gives the generator and the dlog
-map, and `interp.project_1d` and `project_2d` project activations onto
-characters. A Session already holds these as `S.basis` and `S.ci`.
+Every group task computes the operation of a cyclic group, and its dataset
+carries that group as `ds.structure`, a `CyclicStructure`: the order n, the
+tokens that are group elements, and each one's coordinate x in ℤ/n. For
+addition mod n, token t has coordinate t. For multiplication mod p, token
+t ≠ 0 has coordinate dlog(t), so n = p − 1. Multiplication mod p is addition
+mod p − 1 with the tokens renamed, and every analysis is written against the
+structure, so it applies to both:
+
+```pycon
+>>> from crypto_interp.data import TaskSpec
+>>> mul, add = TaskSpec("mul", 113).structure(), TaskSpec("add", 112).structure()
+>>> (mul.n, mul.generator, mul.tokens[:3], mul.coords[:3]), (add.n, add.coords[:3])
+((112, 3, (1, 2, 3), (0, 12, 1)), (112, (0, 1, 2)))
+>>> mul.order(56), add.order(56)  # χ_56 has order 2 in both: the same group
+(2, 2)
+
+```
+
+`structure.char_basis()` returns the real character basis, the Fourier basis
+of ℤ/n pulled back to the group tokens, with a cosine and a sine row per
+character, plus a delta row for each value token outside the group (token 0
+for multiplication). It comes with a `CharIndex` from k to its rows
+(`ci.cos[k]`, `ci.sin[k]`). A Session holds these as `S.basis` and `S.ci`.
+`interp.char_index(p)` and `interp.discrete_log_table(p)` remain for
+multiplication mod p, and `interp.project_1d` and `project_2d` project
+activations onto characters.
 
 ## Interventions
 
@@ -132,6 +153,7 @@ there. `patch_attn_out` and `patch_resid_pre` patch other sites, and
 
 A task is a function `build(p, frac_train, seed) -> Dataset` in
 `crypto_interp/data/`, registered in `crypto_interp.data._TASKS`.
-`data/add.py` is the smallest example. Measures that rely on the
-multiplicative characters need `task="mul"`. For other tasks, construct a
-`Session` with `basis=` and `ci=` for that task's group.
+`data/add.py` is the smallest example. A task that computes a cyclic group's
+operation sets the dataset's `structure` (and is listed in `GROUP_TASKS`), and
+then every measure applies to it. For any other task, construct a `Session`
+with `basis=` and `ci=` for its group.

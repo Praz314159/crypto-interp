@@ -30,20 +30,18 @@ def test_amplitudes_round_trip():
     assert np.allclose(amplitudes_from_kernel(kappa), alpha)
 
 
-def test_pure_kernel_logits_recover_the_kernel_and_its_loss():
-    """Logits that depend only on the dlog offset: κ_obs is that kernel, and the
-    empirical loss equals the closed-form kernel loss."""
-    _, dlog = discrete_log_table(P)
-    alpha = np.zeros((P - 1) // 2 + 1)
+@pytest.mark.parametrize("s", [M(P), CyclicStructure.additive(12)], ids=["mul13", "add12"])
+def test_pure_kernel_logits_recover_the_kernel_and_its_loss(s):
+    """Logits that depend only on the group offset x(a) + x(b) − x(c): κ_obs is that
+    kernel, and the empirical loss equals the closed-form kernel loss."""
+    alpha = np.zeros(s.n // 2 + 1)
     alpha[[1, 4]] = [4.0, 2.0]
-    kappa = kernel_from_amplitudes(alpha, n=P - 1)
-    lg = np.array([dlog[x] for x in range(1, P)])
-    d = (lg[:, None, None] + lg[None, :, None] - lg[None, None, :]) % (P - 1)
-    logits = np.full((P - 1, P - 1, P + 1), -50.0)
-    logits[:, :, 1:P] = kappa[d]
+    kappa = kernel_from_amplitudes(alpha, n=s.n)
+    logits = np.full((s.n, s.n, s.n_values + 1), -50.0)
+    logits[:, :, s.token_array] = kappa[s.offsets()]
 
-    assert np.allclose(observed_kernel(logits, M(P)), kappa)
-    assert empirical_loss(logits, M(P)) == pytest.approx(kernel_loss(kappa), rel=1e-9)
+    assert np.allclose(observed_kernel(logits, s), kappa)
+    assert empirical_loss(logits, s) == pytest.approx(kernel_loss(kappa), rel=1e-9)
 
 
 def test_memorized_pairs_cannot_fake_the_held_out_kernel():

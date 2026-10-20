@@ -54,8 +54,8 @@ class CharAblation:
     base_loss: float  # test loss with nothing ablated
     essential: tuple[int, ...]  # Δlog10 ≥ loss_jump[1]
     load_bearing: tuple[int, ...]  # loss_jump[0] ≤ Δlog10 < loss_jump[1]
-    control_k: int  # the highest-energy character outside K
-    control_dlog10: float  # its ablation impact: what "not in K" looks like
+    control_k: int | None  # the highest-energy character outside K (None if K is everything)
+    control_dlog10: float | None  # its ablation impact: what "not in K" looks like
     dlog10: np.ndarray  # (n_chars,) Δlog10 test loss after ablating χ_k, indexed k − 1
     ablated_loss: np.ndarray  # (n_chars,)
 
@@ -74,13 +74,13 @@ def char_ablation(
     ks = sorted(per)
     dlog10 = np.array([per[k]["dlog10"] for k in ks])
     outside = [k for k in ks if k not in set(r["K"])]
-    control = max(outside, key=lambda k: per[k]["energy"])
+    control = max(outside, key=lambda k: per[k]["energy"]) if outside else None
     return CharAblation(
         base_loss=r["base_loss"],
         essential=tuple(k for k in ks if per[k]["cls"] == "essential"),
         load_bearing=tuple(k for k in ks if per[k]["cls"] == "load-bearing"),
-        control_k=int(control),
-        control_dlog10=float(per[control]["dlog10"]),
+        control_k=None if control is None else int(control),
+        control_dlog10=None if control is None else float(per[control]["dlog10"]),
         dlog10=dlog10,
         ablated_loss=np.array([per[k]["ablated_loss"] for k in ks]),
     )
