@@ -1,8 +1,8 @@
 """Ablation experiments for embedding analysis.
 
-Validate that the model is actually using the key multiplicative-Fourier
-components by:
-  1. Projecting W_E onto the multiplicative basis.
+Validate that the model is actually using the key character components of
+its task's group by:
+  1. Projecting W_E onto the character basis.
   2. Keeping ONLY the top-K key components (zeroing the rest); re-evaluate loss.
      Expectation: loss stays near zero. → embedding really uses these components.
   3. Keeping EVERYTHING EXCEPT those top-K components; re-evaluate loss.
@@ -11,6 +11,7 @@ components by:
 """
 
 import copy
+import math
 
 import numpy as np
 import torch
@@ -105,7 +106,7 @@ def essential_characters(
     and ``K`` is the set of characters with >= ``threshold`` x max W_E energy.
     """
     from .interventions import ablate_char_w  # local import: interventions depends on ablate
-    from .metrics import char_energy, order_of  # local import avoids import cycle
+    from .metrics import char_energy  # local import avoids import cycle
 
     p = ds.p
     W_val = model.embed.W_E.detach()[:, :p]
@@ -124,7 +125,7 @@ def essential_characters(
             energy=float(ce[k - 1]),
             ablated_loss=float(test_loss),
             dlog10=dlog10,
-            order=order_of(k, p),
+            order=ci.n // math.gcd(k, ci.n),
             cls=cls,
         )
     K = sorted(k for k in ci.freqs if ce[k - 1] >= threshold * ce.max())

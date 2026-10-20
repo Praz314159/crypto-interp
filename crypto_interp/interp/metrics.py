@@ -1,7 +1,7 @@
 """Progress measures: per-frequency energy in the embedding over training.
 
-Tracks how much of the embedding's L² norm lives in each multiplicative-Fourier
-frequency over the course of training. Used to visualize the grokking transition
+Tracks how much of the embedding's L² norm lives in each character of the
+task's cyclic group over the course of training. Used to visualize the grokking transition
 as energy migrates from the "uniform" (all-frequencies) initialization to
 sparse concentration on a few key frequencies.
 """
@@ -18,38 +18,34 @@ from .bases import CharIndex
 
 
 def per_frequency_energy_from_embedding(
-    W_E_values: torch.Tensor,
-    mul_basis: torch.Tensor,
-    p: int,
+    W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex
 ) -> list[float]:
     """Return one number per frequency: the energy ``W_E`` carries at that frequency.
 
     Args:
-        W_E_values: (d_model, p) value-token embedding (drop the '=' column).
-        mul_basis: (p, p) orthonormal multiplicative-Fourier basis.
-        p: prime modulus.
+        W_E_values: (d_model, V) value-token embedding (drop the '=' column).
+        basis: (V, V) orthonormal character basis (``structure.char_basis()``).
+        ci: its :class:`CharIndex`.
 
     Returns:
-        A list of length n_freqs giving the per-frequency energy in the order
-        ``k = 1, 2, ..., (p-1-1)//2`` and then ``k = (p-1)/2`` if ``p-1`` is even.
-        Per-frequency energy is the sum of cos and sin contributions for that k.
+        A list giving the energy at each frequency in ``ci.freqs`` (k = 1..⌊n/2⌋):
+        the sum of the cos and sin contributions for that k.
     """
-    coef = torch.einsum("kp,dp->kd", mul_basis.to(torch.float64), W_E_values.to(torch.float64))
-    per_basis_energy = (coef**2).sum(dim=1)  # (p,)
-    n = p - 1
-    freq_e: list[float] = []
-    for k in range(1, (n - 1) // 2 + 1):
-        freq_e.append((per_basis_energy[2 * k] + per_basis_energy[2 * k + 1]).item())
-    if n % 2 == 0:
-        freq_e.append(per_basis_energy[n].item())
-    return freq_e
+    coef = torch.einsum("kp,dp->kd", basis.to(torch.float64), W_E_values.to(torch.float64))
+    per_basis_energy = (coef**2).sum(dim=1)  # (V,)
+    return [
+        (per_basis_energy[rows[0]] + per_basis_energy[rows[1]]).item()
+        if len(rows) == 2
+        else per_basis_energy[rows[0]].item()
+        for rows in (ci.by_char[k] for k in ci.freqs)
+    ]
 
 
 class EmbeddingEnergyTracker:
     """Accumulates per-frequency embedding energy snapshots over training.
 
     Usage:
-        tracker = EmbeddingEnergyTracker(p=ds.p, device=device)
+        tracker = EmbeddingEnergyTracker(ds.structure, device=device)
         for epoch in ...:
             ...
             if epoch % every == 0:
@@ -57,11 +53,8 @@ class EmbeddingEnergyTracker:
         tracker.save(run_dir / "metrics.pt", config={...})
     """
 
-    def __init__(self, p: int, device: str | torch.device = "cpu"):
-        from .bases import multiplicative_fourier_basis
-
-        self.p = p
-        basis, _, _ = multiplicative_fourier_basis(p, device="cpu")
+    def __init__(self, structure, device: str | torch.device = "cpu"):
+        basis, self.ci = structure.char_basis(device="cpu")
         self.basis = basis.to(device)
         self.epochs: list[int] = []
         self.freq_energies: list[list[float]] = []
@@ -70,7 +63,7 @@ class EmbeddingEnergyTracker:
         with torch.no_grad():
             self.epochs.append(int(epoch))
             self.freq_energies.append(
-                per_frequency_energy_from_embedding(W_E_values, self.basis, self.p)
+                per_frequency_energy_from_embedding(W_E_values, self.basis, self.ci)
             )
 
     def restore(self, payload: dict) -> None:
@@ -94,31 +87,31 @@ class EmbeddingEnergyCallback:
     and save it to ``<run_dir>/metrics.pt``. On resume it appends to the saved record.
 
     Use :meth:`for_task` rather than the constructor: the energy is only meaningful
-    in the task's own character basis, and only ``mul`` has one defined here.
+    in the character basis of the task's own group.
     """
 
     FILENAME = "metrics.pt"
 
-    def __init__(self, p: int, every: int):
-        self.p = p
+    def __init__(self, structure, every: int):
+        self.structure = structure
         self.every = every
         self.tracker: EmbeddingEnergyTracker | None = None
         self._config: dict = {}
 
     @classmethod
     def for_task(cls, task, every: int) -> EmbeddingEnergyCallback:
-        from ..data import MULTIPLICATIVE_TASKS
+        from ..data import GROUP_TASKS
 
-        if task.task not in MULTIPLICATIVE_TASKS:
+        if task.task not in GROUP_TASKS:
             raise ValueError(
                 f"no character basis for embedding-energy tracking on task {task.task!r} "
-                f"(only {sorted(MULTIPLICATIVE_TASKS)}); set metrics_every=0"
+                f"(only the group tasks {sorted(GROUP_TASKS)}); set metrics_every=0"
             )
-        return cls(task.p, every)
+        return cls(task.structure(), every)
 
     def on_train_start(self, run_dir, model, task, start_epoch: int) -> None:
         device = model.embed.W_E.device
-        self.tracker = EmbeddingEnergyTracker(p=self.p, device=device)
+        self.tracker = EmbeddingEnergyTracker(self.structure, device=device)
         saved = Path(run_dir) / self.FILENAME
         if start_epoch > 0 and saved.exists():
             self.tracker.restore(torch.load(saved, weights_only=False))
@@ -126,7 +119,7 @@ class EmbeddingEnergyCallback:
 
     def on_epoch_end(self, epoch: int, model) -> None:
         if epoch % self.every == 0:
-            self.tracker.record(epoch, model.embed.W_E[:, : self.p].detach())
+            self.tracker.record(epoch, model.embed.W_E[:, : self.structure.n_values].detach())
 
     def on_train_end(self, run_dir) -> None:
         self.tracker.save(Path(run_dir) / self.FILENAME, config=self._config)

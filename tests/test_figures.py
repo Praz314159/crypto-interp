@@ -55,7 +55,10 @@ def test_error_figures_render(S):
     from crypto_interp.measures import errors
 
     e = errors(S)
-    for fig in (efig.profile(e, "ref"), efig.population({"ref": e}, {"ref": "grokked"})):
+    for fig in (
+        efig.profile(e, S.ds.structure, "ref"),
+        efig.population({"ref": e}, {"ref": "grokked"}),
+    ):
         assert fig.axes
         matplotlib.pyplot.close(fig)
 
@@ -109,8 +112,8 @@ def test_character_figures_render(S):
     for fig in (
         chfig.ablation(char_ablation(S), energy_support(S), "ref"),
         chfig.delta_spectrum(h),
-        chfig.delta(h, 10, S.ds.p),
-        chfig.cluster(nc, 10, S.ds.p),
+        chfig.delta(h, 10, S.ds.structure),
+        chfig.cluster(nc, 10, S.ds.structure),
         chfig.fourier2d(fourier2d(S)),
     ):
         assert fig.axes

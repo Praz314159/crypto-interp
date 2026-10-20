@@ -61,8 +61,8 @@ def test_energy_callback_records_and_continues_across_resume(tmp_path):
     assert (resumed["freq_energies"] == reference["freq_energies"]).all()
     assert resumed["config"]["metrics_every"] == 5
 
-    with pytest.raises(ValueError, match="'add'"):
-        EmbeddingEnergyCallback.for_task(TaskSpec("add", 7), every=5)
+    with pytest.raises(ValueError, match="'sqrt_of_product'"):
+        EmbeddingEnergyCallback.for_task(TaskSpec("sqrt_of_product", 7), every=5)
 
 
 def test_no_callbacks_writes_no_metrics(tmp_path):

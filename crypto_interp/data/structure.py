@@ -161,11 +161,23 @@ class CyclicStructure:
         return np.array(self.tokens, dtype=np.int64)
 
     @cached_property
+    def position(self) -> np.ndarray:
+        """(n_values,) each value token's index among the group tokens; −1 outside the group."""
+        out = np.full(self.n_values, -1, dtype=np.int64)
+        out[self.token_array] = np.arange(self.n)
+        return out
+
+    @cached_property
     def token_at(self) -> np.ndarray:
         """(n,) ``token_at[x]`` is the group token with coordinate x."""
         out = np.empty(self.n, dtype=np.int64)
         out[self.x] = self.token_array
         return out
+
+    @property
+    def coord_name(self) -> str:
+        """What the coordinate is called in labels: "dlog" for (Z/p)*, "x" for Z/n."""
+        return "dlog" if self.op == "×" else "x"
 
     @cached_property
     def coord_order(self) -> np.ndarray:

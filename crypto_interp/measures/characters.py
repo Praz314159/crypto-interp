@@ -28,30 +28,20 @@ from .core import measure
 @dataclass
 class EnergySupport:
     K: tuple[int, ...]
-    orders: tuple[int, ...]  # multiplicative order of each χ_k in K
+    orders: tuple[int, ...]  # order of each χ_k in K: n / gcd(k, n)
     threshold: float
     energy: np.ndarray  # (n_chars,) energy of W_E at character k, indexed k − 1
-    char_order: np.ndarray  # (n_chars,) multiplicative order of χ_k, indexed k − 1
+    char_order: np.ndarray  # (n_chars,) order of χ_k, indexed k − 1
 
 
 @measure("energy_support", version=1)
 def energy_support(S, threshold: float = 0.05) -> EnergySupport:
     """K = {k : energy_k ≥ threshold · max energy} over the value-token embedding."""
-    from ..interp.metrics import order_of
-
-    p = S.ds.p
+    s = S.ds.structure
     E = S.char_energy()
     K = tuple(int(k) for k in S.ci.freqs if E[k - 1] >= threshold * E.max())
-    orders = np.array([order_of(k, p) for k in range(1, len(E) + 1)])
-    return EnergySupport(K, tuple(order_of(k, p) for k in K), threshold, E, orders)
-
-
-def dlog_order(p: int) -> np.ndarray:
-    """Indices that sort the units 1..p−1 by discrete log (for dlog-ordered plots)."""
-    from ..interp.bases import discrete_log_table
-
-    _, dlog = discrete_log_table(p)
-    return np.argsort([dlog[a] for a in range(1, p)])
+    orders = np.array([s.order(k) for k in range(1, len(E) + 1)])
+    return EnergySupport(K, tuple(s.order(k) for k in K), threshold, E, orders)
 
 
 def support(S, K=None) -> tuple[int, ...]:
@@ -104,10 +94,10 @@ class Helpers:
     helper_of: tuple[int, ...]  # for each helper, the frequency it destroys
     helper_mult: tuple[int, ...]  # j with χ_{j·primary} = χ_helper (fold-aware); 0 if none ≤ 8
     dominant: tuple[int, ...]  # for each k in K, the dominant frequency of Δ_k
-    delta_corr: tuple[float, ...]  # corr of Δ_k(Δlog) with cos(2πk·Δlog/(p−1)), per k in K
-    spectrum: np.ndarray  # (|K|, (p−1)/2) Fourier energy of Δ_k(Δlog)
-    delta_diff: np.ndarray  # (|K|, p−1) Δ_k reduced to the dlog offset
-    delta_ab: np.ndarray  # (|K|, p−1, p−1) Δ_k(ab, c), averaged over (a, b) with the same ab
+    delta_corr: tuple[float, ...]  # corr of Δ_k(D) with cos(2πk·D/n), per k in K
+    spectrum: np.ndarray  # (|K|, n/2) Fourier energy of Δ_k(D)
+    delta_diff: np.ndarray  # (|K|, n) Δ_k reduced to the coordinate offset D (dlog for mul)
+    delta_ab: np.ndarray  # (|K|, n, n) Δ_k(ab, c), averaged over (a, b) with the same ab
 
 
 @measure("helpers", version=1)
@@ -118,26 +108,26 @@ def helpers(S, K=None, max_mult: int = 8) -> Helpers:
     from ..interp.metrics import correlate
     from ..interp.reductions import fourier_spectrum_1d, reduce_to_ab, reduce_to_diff
 
-    p = S.ds.p
+    s = S.ds.structure
     K = support(S, K)
     full = compute_logits_grid(S.model, S.ds)
     dominant, spectra, diffs, abs_, corr = [], [], [], [], []
     for k in K:
         grid = delta_k(S.model, S.ds, S.ci, S.basis, k, logits_full=full)
-        f = reduce_to_diff(grid, p, value_axis="full")
+        f = reduce_to_diff(grid, s, value_axis="full")
         spec = fourier_spectrum_1d(f)
         dominant.append(int(spec.argmax() + 1))
         spectra.append(spec)
         diffs.append(f)
-        abs_.append(reduce_to_ab(grid, p)[:, 1:p])
-        corr.append(correlate(f, np.cos(2 * np.pi * k * np.arange(p - 1) / (p - 1))))
+        abs_.append(reduce_to_ab(grid, s)[:, s.token_array])
+        corr.append(correlate(f, np.cos(2 * np.pi * k * np.arange(s.n) / s.n)))
     pairs = [(k, m) for k, m in zip(K, dominant, strict=True) if m != k]
     return Helpers(
         K=K,
         primaries=tuple(k for k, m in zip(K, dominant, strict=True) if m == k),
         helpers=tuple(k for k, _ in pairs),
         helper_of=tuple(m for _, m in pairs),
-        helper_mult=tuple(helper_multiplier(k, m, p, max_mult=max_mult) or 0 for k, m in pairs),
+        helper_mult=tuple(helper_multiplier(k, m, s, max_mult=max_mult) or 0 for k, m in pairs),
         dominant=tuple(dominant),
         delta_corr=tuple(float(c) for c in corr),
         spectrum=np.array(spectra),
@@ -152,8 +142,8 @@ class NeuronClusters:
     sizes: tuple[int, ...]  # neurons whose dominant character is k, per k in K
     corr: tuple[float, ...]  # cluster output vs cos(θ_k(a) + θ_k(b)); nan for an empty cluster
     dominant_char: np.ndarray  # (d_mlp,) each neuron's dominant character
-    signal: np.ndarray  # (|K|, p−1, p−1) cluster output along the unembed's χ_k read direction
-    reference: np.ndarray  # (|K|, p−1, p−1) cos(θ_k(a) + θ_k(b))
+    signal: np.ndarray  # (|K|, n, n) cluster output along the unembed's χ_k read direction
+    reference: np.ndarray  # (|K|, n, n) cos(θ_k(a) + θ_k(b))
 
 
 @measure("neuron_clusters", version=1)
@@ -162,7 +152,7 @@ def neuron_clusters(S, K=None) -> NeuronClusters:
     from ..interp.metrics import correlate
 
     K = support(S, K)
-    n = S.ds.p - 1
+    n = S.ds.structure.n
     _, dom = S.per_neuron_dominant_char()
     sizes, corr, sig, ref = [], [], [], []
     for k in K:
@@ -191,9 +181,8 @@ def fourier2d(S, hook: str = "blocks.0.hook_mlp_out") -> Fourier2D:
 
     from ..interp.grids import compute_activation_grid
 
-    p = S.ds.p
-    f_ab = compute_activation_grid(S.model, S.ds, hook)  # (p−1, p−1, width)
-    basis_v = S.basis[:, 1:p].double()
+    f_ab = compute_activation_grid(S.model, S.ds, hook)  # (n, n, width)
+    basis_v = S.basis[:, S.ds.structure.token_array].double()  # the group tokens' columns
     coef = torch.einsum("ka,lb,abd->kld", basis_v, basis_v, f_ab)
     E_basis = (coef**2).sum(dim=-1).cpu().numpy()
     nch = max(S.ci.freqs)

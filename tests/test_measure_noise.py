@@ -3,12 +3,14 @@
 import numpy as np
 import pytest
 
+from crypto_interp.data import CyclicStructure
 from crypto_interp.interp import discrete_log_table
 from crypto_interp.measures import noise_modes
 from crypto_interp.measures.kernel import kernel_from_amplitudes
 from crypto_interp.measures.noise import noise_modes_of
 
 P = 13
+M = CyclicStructure.multiplicative
 
 
 def _kernel_logits(p=P, bias=None):
@@ -16,7 +18,7 @@ def _kernel_logits(p=P, bias=None):
     _, dlog = discrete_log_table(p)
     alpha = np.zeros((p - 1) // 2 + 1)
     alpha[[1, 3]] = [5.0, 2.0]
-    kappa = kernel_from_amplitudes(alpha, p)
+    kappa = kernel_from_amplitudes(alpha, n=p - 1)
     lg = np.array([dlog[x] for x in range(1, p)])
     d = (lg[:, None, None] + lg[None, :, None] - lg[None, None, :]) % (p - 1)
     logits = np.full((p - 1, p - 1, p + 1), -30.0)
@@ -25,9 +27,9 @@ def _kernel_logits(p=P, bias=None):
 
 
 def test_noise_of_a_pure_kernel_is_zero_and_a_class_bias_is_single_c():
-    clean = noise_modes_of(_kernel_logits(), P)
+    clean = noise_modes_of(_kernel_logits(), M(P))
     assert clean.total_power < 1e-18
-    biased = noise_modes_of(_kernel_logits(bias=np.linspace(-1, 1, P - 1)), P)
+    biased = noise_modes_of(_kernel_logits(bias=np.linspace(-1, 1, P - 1)), M(P))
     assert biased.single_c == pytest.approx(biased.total_power, rel=1e-9)
     assert biased.top_classes[0] == "single_c"
 

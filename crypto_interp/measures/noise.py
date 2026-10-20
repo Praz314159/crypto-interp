@@ -48,14 +48,12 @@ NOISE_CLASSES = (
 )
 
 
-def logits_in_dlog_coords(logits_grid: np.ndarray, p: int, dlog: dict[int, int]) -> np.ndarray:
-    """``L[x_a, x_b, x_c]`` = logit of c for inputs (a, b), indexed by discrete logs."""
-    n = p - 1
-    by_dlog = np.empty(n, dtype=np.int64)  # by_dlog[x] = (unit with dlog x) − 1
-    for unit, x in dlog.items():
-        by_dlog[x] = unit - 1
-    L = np.asarray(logits_grid)[..., 1:p].astype(np.float64)
-    return L[np.ix_(by_dlog, by_dlog, by_dlog)]
+def logits_in_coords(logits_grid: np.ndarray, structure) -> np.ndarray:
+    """``L[x_a, x_b, x_c]`` = logit of c for inputs (a, b), indexed by group
+    coordinates (discrete logs for mul)."""
+    by_x = structure.coord_order  # by_x[x] = position of the group token with coordinate x
+    L = np.asarray(logits_grid)[..., structure.token_array].astype(np.float64)
+    return L[np.ix_(by_x, by_x, by_x)]
 
 
 def mode_classes(n: int) -> dict[str, np.ndarray]:
@@ -85,7 +83,7 @@ class NoiseModes:
     total_power: float  # Σ|Ê|² over all modes of ε
     noise_at_target_var: float  # Var over (a, b) of ε(a, b, ab): the noise the CE sees
     noise_at_target_mean: float  # ≈ 0 by construction
-    kernel_3d_power: float  # (p−1)² Σ_d κ_obs(d)²
+    kernel_3d_power: float  # n² Σ_d κ_obs(d)²
     snr_3d: float  # kernel_3d_power / total_power
     single_a: float
     single_b: float
@@ -100,13 +98,10 @@ class NoiseModes:
     top_modes: np.ndarray  # (n_top, 4): k_a, k_b, k_c, power
 
 
-def noise_modes_of(logits_grid: np.ndarray, p: int, n_top: int = 12) -> NoiseModes:
-    from ..interp.bases import discrete_log_table
-
-    n = p - 1
-    _, dlog = discrete_log_table(p)
-    kappa = observed_kernel(logits_grid, p, dlog)
-    L = logits_in_dlog_coords(logits_grid, p, dlog)
+def noise_modes_of(logits_grid: np.ndarray, structure, n_top: int = 12) -> NoiseModes:
+    n = structure.n
+    kappa = observed_kernel(logits_grid, structure)
+    L = logits_in_coords(logits_grid, structure)
     x = np.arange(n)
     d = (x[:, None, None] + x[None, :, None] - x[None, None, :]) % n
     eps = L - kappa[d]
@@ -125,7 +120,7 @@ def noise_modes_of(logits_grid: np.ndarray, p: int, n_top: int = 12) -> NoiseMod
     total = float(power.sum())
     kernel_3d = n * n * float(np.sum(kappa**2))
     return NoiseModes(
-        L_emp=empirical_loss(logits_grid, p),
+        L_emp=empirical_loss(logits_grid, structure),
         L_sym=kernel_loss(kappa),
         total_power=total,
         noise_at_target_var=float(at_target.var()),
@@ -141,4 +136,4 @@ def noise_modes_of(logits_grid: np.ndarray, p: int, n_top: int = 12) -> NoiseMod
 @measure("noise_modes", version=1)
 def noise_modes(S, n_top: int = 12) -> NoiseModes:
     """Fourier mode classes of the asymmetric residual of the model in Session ``S``."""
-    return noise_modes_of(S.logits_grid.detach().cpu().numpy(), S.ds.p, n_top=n_top)
+    return noise_modes_of(S.logits_grid.detach().cpu().numpy(), S.ds.structure, n_top=n_top)

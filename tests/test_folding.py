@@ -2,7 +2,10 @@
 f with (p-1)-f, so products in the complex character group must be folded back
 before relating them to real-basis indices."""
 
+from crypto_interp.data import CyclicStructure
 from crypto_interp.interp import fold_frequency, helper_multiplier
+
+M = CyclicStructure.multiplicative
 
 
 def test_fold_frequency():
@@ -16,15 +19,15 @@ def test_fold_frequency():
 
 def test_helper_multiplier_fold_aware():
     # p=127 (the seed-3 cases): 30=2*15 (no fold), 22=fold(2*52) (folded doubling)
-    assert helper_multiplier(30, 15, 127) == 2
-    assert helper_multiplier(22, 52, 127) == 2  # would be missed without folding (2*52=104)
+    assert helper_multiplier(30, 15, M(127)) == 2
+    assert helper_multiplier(22, 52, M(127)) == 2  # would be missed without folding (2*52=104)
     # p=127 seed-1: 60 = fold(3*22) is a Sylow-3 rider, not a doubling
-    assert helper_multiplier(60, 22, 127) == 3
+    assert helper_multiplier(60, 22, M(127)) == 3
 
     # p=113 (the original reference helpers): plain doublings
-    assert helper_multiplier(44, 22, 113) == 2
-    assert helper_multiplier(6, 3, 113) == 2
-    assert helper_multiplier(20, 10, 113) == 2
+    assert helper_multiplier(44, 22, M(113)) == 2
+    assert helper_multiplier(6, 3, M(113)) == 2
+    assert helper_multiplier(20, 10, M(113)) == 2
 
     # an unrelated pair returns None
-    assert helper_multiplier(7, 22, 127) is None
+    assert helper_multiplier(7, 22, M(127)) is None

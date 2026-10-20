@@ -1,7 +1,8 @@
-"""Visualize one forward pass of the learned mod-mul algorithm, stage by stage.
+"""Visualize one forward pass of the learned group operation, stage by stage.
 
-For a single input (a, b), render the computation in the multiplicative
-character basis, where each stage of the algorithm is geometric:
+For a single input (a, b), render the computation in the character basis of
+the task's cyclic group (multiplicative characters for mul mod p, Fourier modes
+for add mod n), where each stage of the algorithm is geometric:
 
   Row 1 — clocks: every token's embedding projected onto each essential
       character's 2D plane in W_E; the inputs a, b highlighted as hands at
@@ -13,7 +14,8 @@ character basis, where each stage of the algorithm is geometric:
       at θ_k(a) + θ_k(b) = θ_k(a·b).  Helper characters have no neurons of
       their own (they ride a primary's cluster) and are annotated as such.
   Row 3 — interference: the actual logits of this forward pass decomposed
-      per character over candidates c in dlog order — each character's wave
+      per character over candidates c in coordinate order (dlog order for
+      mul) — each character's wave
       is individually ambiguous (coset-periodic); their sum spikes at the
       answer.  Model logits overlaid in gray.
 
@@ -28,7 +30,6 @@ import torch
 
 from crypto_interp import measures
 from crypto_interp.interp import Session
-from crypto_interp.interp.bases import discrete_log_table
 
 # ---------------------------------------------------------------------------
 # Geometry helpers
@@ -37,7 +38,7 @@ from crypto_interp.interp.bases import discrete_log_table
 
 def char_plane(S: Session, k: int) -> tuple[np.ndarray, np.ndarray]:
     """Orthonormal 2D frame (e1, e2) of character k's plane in embedding space."""
-    W_E = S.model.embed.W_E.detach().double()[:, : S.ds.p]  # (d_model, p)
+    W_E = S.model.embed.W_E.detach().double()[:, : S.ds.p]  # (d_model, value tokens)
     c = (W_E @ S.basis[S.ci.cos[k]]).numpy()
     e1 = c / (np.linalg.norm(c) + 1e-12)
     if k in S.ci.sin:
@@ -51,8 +52,8 @@ def char_plane(S: Session, k: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 def token_coords(S: Session, e1: np.ndarray, e2: np.ndarray) -> np.ndarray:
-    """(p-1, 2) coordinates of tokens 1..p-1 in the (e1, e2) frame."""
-    W_E = S.model.embed.W_E.detach().double()[:, 1 : S.ds.p].numpy()  # skip 0
+    """(n, 2) coordinates of the group tokens in the (e1, e2) frame, in token order."""
+    W_E = S.model.embed.W_E.detach().double()[:, S.ds.structure.token_array].numpy()
     return np.stack([e1 @ W_E, e2 @ W_E], axis=1)
 
 
@@ -70,21 +71,27 @@ def neuron_phases(
 
 
 def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
-    p = S.ds.p
-    n = p - 1
-    g, dlog = discrete_log_table(p)
-    if a % p == 0 or b % p == 0:
-        raise ValueError("a and b must be nonzero mod p (dlog undefined at 0)")
+    s = S.ds.structure
+    p, n = S.ds.p, s.n
+    mul = s.op == "×"
+    if s.position[a % p] < 0 or s.position[b % p] < 0:
+        raise ValueError(
+            "a and b must be group elements (for mul: nonzero mod p, dlog undefined at 0)"
+        )
     if K is None:
         K = list(measures.energy_support(S).K)
     h = measures.helpers(S, K=K)
     helpers = dict(zip(h.helpers, h.helper_of, strict=True))
     _, dom = S.per_neuron_dominant_char()
 
-    theta = lambda k, x: 2 * np.pi * k * dlog[x % p] / n  # noqa: E731
-    x_a, x_b = dlog[a % p], dlog[b % p]
-    ans = (a * b) % p
+    def coord(t: int) -> int:
+        return int(s.x[s.position[t % p]])
+
+    theta = lambda k, x: 2 * np.pi * k * coord(x) / n  # noqa: E731
+    x_a, x_b = coord(a), coord(b)
     x_ans = (x_a + x_b) % n
+    ans = int(s.token_at[x_ans])
+    ab, cname = ("a·b", "dlog") if mul else ("a+b", "x")
 
     # Forward pass on the single input.
     eq = S.ds.eq_token
@@ -104,8 +111,8 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
         e1, e2 = char_plane(S, k)
         pts = token_coords(S, e1, e2)
         ax.scatter(pts[:, 0], pts[:, 1], s=6, c="lightgray", zorder=1)
-        for tok, color, lab in ((a % p, "C0", "a"), (b % p, "C1", "b"), (ans, "C2", "a·b")):
-            x, y = pts[tok - 1]
+        for tok, color, lab in ((a % p, "C0", "a"), (b % p, "C1", "b"), (ans, "C2", ab)):
+            x, y = pts[s.position[tok]]
             ax.annotate(
                 "", xy=(x, y), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color=color, lw=2)
             )
@@ -147,13 +154,16 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
 
     ax = fig.add_subplot(gs[1, ncol - 1])
     ax.axis("off")
-    ax.annotate(
-        f"p = {p}, g = {g}\n"
+    header = (
+        f"p = {p}, g = {s.generator}\n"
         f"dlog(a)={x_a}, dlog(b)={x_b}\n"
         f"dlog(ab)={x_ans}\n"
         f"answer a·b mod p = {ans}\n\n"
-        f"K = {K}\n"
-        f"helpers: {helpers or 'none'}",
+        if mul
+        else f"n = {n}\n\nanswer a+b mod n = {ans}\n\n"
+    )
+    ax.annotate(
+        header + f"K = {K}\nhelpers: {helpers or 'none'}",
         xy=(0.05, 0.5),
         xycoords="axes fraction",
         fontsize=9,
@@ -161,9 +171,8 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     )
 
     # ---- Row 3: interference ---------------------------------------------
-    # Decompose THIS forward pass's logits per character, in dlog order.
-    order = np.argsort([dlog[c] for c in range(1, p)])  # tokens sorted by dlog
-    toks_by_dlog = np.arange(1, p)[order]
+    # Decompose THIS forward pass's logits per character, in coordinate (dlog) order.
+    toks_by_dlog = s.token_array[s.coord_order]  # group tokens sorted by coordinate
     xs = np.arange(n)
 
     ax = fig.add_subplot(gs[2, :])
@@ -184,21 +193,21 @@ def make_figure(S: Session, a: int, b: int, K: list[int] | None = None):
     ax.plot(xs, (Lc - Lc.mean()) + offset, color="gray", lw=0.8, alpha=0.6, label="actual logits")
     ax.axvline(x_ans, color="C2", lw=1.2, linestyle=":")
     ax.annotate(
-        f"dlog(ab) = {x_ans}",
+        f"{cname}({'ab' if mul else 'a+b'}) = {x_ans}",
         xy=(x_ans, ax.get_ylim()[1]),
         fontsize=8,
         color="C2",
         ha="center",
         va="bottom",
     )
-    ax.set_xlabel("candidate c, ordered by dlog(c)")
+    ax.set_xlabel(f"candidate c, ordered by {cname}(c)")
     ax.set_yticks([])
     ax.legend(fontsize=8, ncol=len(K) + 2, loc="lower left")
     ax.set_title(
-        "per-character logit waves (each coset-ambiguous) → constructive interference at c = a·b",
+        f"per-character logit waves (each coset-ambiguous) → constructive interference at c = {ab}",
         fontsize=10,
     )
 
-    fig.suptitle(f"{a} × {b} ≡ {ans}  (mod {p})", fontsize=13)
+    fig.suptitle(f"{a} {s.op} {b} ≡ {ans}  (mod {p})", fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig
