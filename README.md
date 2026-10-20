@@ -59,7 +59,7 @@ number means.
 
 ```text
 crypto_interp/
-  data/        tasks (mul, mul_units, add, sqrt_of_product) as datasets, built from a TaskSpec
+  data/        tasks (mul, mul_units, add, sqrt_of_product) as datasets, and the cyclic group each computes
   models/      the one-layer transformer, with hook points
   reference/   textbook algorithms (Tonelli–Shanks, Cipolla) for labels and comparison
   training/    the training loop and ExperimentConfig

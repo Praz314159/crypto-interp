@@ -164,14 +164,14 @@ class AttentionSplit:
 
 @measure("attention_split", version=1)
 def attention_split(S) -> AttentionSplit:
-    pattern = S.cache.grid("attn_attn", units=True)[..., -1, :]  # from '=', over (a, b, =)
+    pattern = S.cache.grid("attn_attn", group=True)[..., -1, :]  # from '=', over (a, b, =)
     split = (pattern[..., 0] - pattern[..., 1]).numpy()
     return AttentionSplit(tuple(np.abs(split).mean(axis=(0, 1)).tolist()), split)
 ```
 
 `S.cache` runs the model once over every (a, b) and keeps every activation;
-`grid(..., units=True)` arranges them as a (p−1) × (p−1) grid over the
-nonzero inputs. Scalar and tuple fields become table columns, and arrays stay
+`grid(..., group=True)` arranges them as an n × n grid over the group's
+elements, here the nonzero inputs. Scalar and tuple fields become table columns, and arrays stay
 in the cache, returned by `.at`. Once defined, the measure is registered and
 has `.at`, `.over` and the CLI (`crypto-interp measure attention_split …`):
 

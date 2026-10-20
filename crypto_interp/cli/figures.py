@@ -102,7 +102,7 @@ def _trajectory(pop, args):
 @recipe("error-profile", "one run's margins, error map and per-token error rates")
 def _error_profile(pop, args):
     run = _one(pop)
-    return errors.profile(M.errors.at(run.latest()), run.id)
+    return errors.profile(M.errors.at(run.latest()), run.task.structure(), run.id)
 
 
 @recipe("char-ablation", "one run's per-character ablation impact")
@@ -121,13 +121,13 @@ def _delta_spectrum(pop, args):
 @recipe("delta", "one run's Δ_k map for --k")
 def _delta(pop, args):
     run = _one(pop)
-    return characters.delta(M.helpers.at(run.latest()), args.k, run.task.p)
+    return characters.delta(M.helpers.at(run.latest()), args.k, run.task.structure())
 
 
 @recipe("cluster", "one run's χ_k neuron cluster (--k) against its reference")
 def _cluster(pop, args):
     run = _one(pop)
-    return characters.cluster(M.neuron_clusters.at(run.latest()), args.k, run.task.p)
+    return characters.cluster(M.neuron_clusters.at(run.latest()), args.k, run.task.structure())
 
 
 @recipe("fourier2d", "one run's MLP output energy over character pairs")

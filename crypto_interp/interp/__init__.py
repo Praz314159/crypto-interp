@@ -29,9 +29,9 @@ from .grids import (
     compute_activation_grid,
     compute_logits_grid,
     full_grid_inputs,
-    to_units,
-    units_grid_inputs,
-    units_mask,
+    group_grid_inputs,
+    group_mask,
+    to_group,
 )
 from .harmonic import delta_k, delta_k_spectrum, find_primary_helper_pairs, helper_multiplier
 from .hooks import hooks, patch_hook, project_hook, run_with_hooks, zero_hook
@@ -115,9 +115,9 @@ __all__ = [
     # grids
     "as_full_grid",
     "full_grid_inputs",
-    "to_units",
-    "units_mask",
-    "units_grid_inputs",
+    "group_grid_inputs",
+    "group_mask",
+    "to_group",
     "compute_logits_grid",
     "compute_activation_grid",
     # reductions

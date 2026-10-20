@@ -1,140 +1,49 @@
-"""Bases for analyzing activations on Z/p × Z/p input grids.
+"""Character bases for the cyclic groups the tasks live on.
 
-Two bases of interest for modular-arithmetic tasks:
+The bases themselves are built by :class:`crypto_interp.data.CyclicStructure`
+(``ds.structure.char_basis()``): the Fourier basis of Z/n pulled back to the
+group's tokens through their coordinates. For multiplication mod p that is the
+multiplicative Fourier basis of (Z/p)*, through the discrete log; for addition
+mod n it is the ordinary Fourier basis.
 
-  - ADDITIVE Fourier basis on Z/p: characters of (Z/p, +). Used by Nanda for
-    modular addition. Basis vectors are:
-        const = 1/sqrt(p) * [1, 1, ..., 1]
-        cos_k = sqrt(2/p) * [cos(2πk·x/p) for x in 0..p-1]    for k=1..(p-1)/2
-        sin_k = sqrt(2/p) * [sin(2πk·x/p) for x in 0..p-1]    for k=1..(p-1)/2
-
-  - MULTIPLICATIVE Fourier basis on (Z/p)*: characters of (Z/p)*, ≅ Z/(p-1).
-    Computed by taking the discrete log w.r.t. a primitive root g, then doing
-    additive Fourier analysis on Z/(p-1). Indexed over a..p-1; we leave the
-    a=0 row separate because 0 is not in (Z/p)*.
-
-The two bases give very different sparsity patterns. For modular addition,
-activations are sparse in the additive basis. For modular multiplication, we
-predict sparsity in the multiplicative basis.
+This module keeps the prime-specific entry points (:func:`char_index`,
+:func:`multiplicative_fourier_basis`, :func:`fold_frequency`) and the
+projection helpers.
 """
-
-import re
-from dataclasses import dataclass
 
 import torch
 
-# ---------- Additive Fourier basis on Z/p ----------
+from ..data.structure import (
+    CharIndex,
+    CyclicStructure,
+    additive_fourier_basis,
+    discrete_log_table,
+    primitive_root,
+)
 
-
-def additive_fourier_basis(n: int, device: str = "cpu") -> tuple[torch.Tensor, list[str]]:
-    """Returns (basis, names) where basis is an (n, n) orthonormal matrix
-    on R^n indexed over Z/n.
-
-    Row 0 is the constant. For k = 1, ..., (n-1)//2 we include the pair
-    (cos_k, sin_k). For even n we add one extra cos at k = n/2 (the sin at
-    that frequency is identically zero).
-    """
-    basis = []
-    names = []
-    x = torch.arange(n, device=device, dtype=torch.float64)
-    basis.append(torch.ones(n, device=device, dtype=torch.float64) / (n**0.5))
-    names.append("const")
-    for k in range(1, (n - 1) // 2 + 1):
-        c = torch.cos(2 * torch.pi * x * k / n)
-        s = torch.sin(2 * torch.pi * x * k / n)
-        basis.append(c / c.norm())
-        basis.append(s / s.norm())
-        names.append(f"cos {k}")
-        names.append(f"sin {k}")
-    if n % 2 == 0:
-        c = torch.cos(2 * torch.pi * x * (n // 2) / n)  # alternating ±1
-        basis.append(c / c.norm())
-        names.append(f"cos {n // 2}")
-    return torch.stack(basis, dim=0), names
-
-
-# ---------- Multiplicative Fourier basis on (Z/p)* ----------
-
-
-def primitive_root(p: int) -> int:
-    """Find the smallest primitive root g of (Z/p)*."""
-    factors = _factorize(p - 1)
-    for g in range(2, p):
-        if all(pow(g, (p - 1) // q, p) != 1 for q in factors):
-            return g
-    raise RuntimeError(f"No primitive root found for {p}")
-
-
-def _factorize(n: int) -> list[int]:
-    out = []
-    d = 2
-    while d * d <= n:
-        if n % d == 0:
-            out.append(d)
-            while n % d == 0:
-                n //= d
-        d += 1
-    if n > 1:
-        out.append(n)
-    return out
-
-
-def discrete_log_table(p: int) -> tuple[int, dict[int, int]]:
-    """Return (g, dlog) where g is a primitive root and dlog[a] = k s.t. g^k ≡ a mod p,
-    for a in 1..p-1. (a=0 is undefined.)
-    """
-    g = primitive_root(p)
-    dlog = {}
-    val = 1
-    for k in range(p - 1):
-        dlog[val] = k
-        val = (val * g) % p
-    return g, dlog
+__all__ = [
+    "CharIndex",
+    "additive_fourier_basis",
+    "char_index",
+    "discrete_log_table",
+    "fold_frequency",
+    "multiplicative_fourier_basis",
+    "primitive_root",
+    "project_1d",
+    "project_2d",
+]
 
 
 def multiplicative_fourier_basis(
     p: int, device: str = "cpu"
 ) -> tuple[torch.Tensor, list[str], int]:
-    """Build a basis for functions on Z/p indexed via the multiplicative group.
+    """``(basis, names, g)``: the (p, p) character basis of (Z/p)* with a delta_0 row first.
 
-    The basis we return is for vectors of length p, but each basis vector is
-    only nonzero on indices a ∈ (Z/p)* = {1, ..., p-1} and zero on a=0. We
-    explicitly include a "delta_0" row to handle the a=0 case.
-
-    Layout: row 0 is delta_0 (1 at index 0, 0 elsewhere). Rows 1..p-1 are the
-    additive Fourier basis on Z/(p-1) pulled back through the discrete log:
-    basis_k(a) = (additive_basis_k(dlog(a))) for a != 0, and 0 at a = 0.
-
-    The returned basis is orthonormal w.r.t. the standard inner product on R^p.
+    See :meth:`CyclicStructure.char_basis`.
     """
-    g, dlog = discrete_log_table(p)
-    n = p - 1  # size of (Z/p)*
-
-    # First build additive basis on Z/n.
-    add_basis_n, add_names_n = additive_fourier_basis(n, device=device)  # (n, n)
-
-    # Pull each additive basis vector back to a vector in R^p indexed by a.
-    # We want b_k(a) = add_basis_n[k, dlog(a)] for a != 0, and 0 for a = 0.
-    # Construct an indexing tensor of length p: idx[a] = dlog(a) for a != 0,
-    # and we'll place 0 at index a=0.
-    pulled = torch.zeros(n, p, device=device, dtype=torch.float64)
-    for a in range(1, p):
-        pulled[:, a] = add_basis_n[:, dlog[a]]
-    # pulled[k, a] is now the multiplicative-character k evaluated at a, for a in 1..p-1.
-
-    # Each pulled[k] vector has L2 norm ≤ 1; we need to renormalize on R^p (since
-    # add_basis_n was orthonormal on R^n, but pulled[k] now has p-1 nonzeros).
-    norms = pulled.norm(dim=1, keepdim=True)
-    norms = torch.where(norms > 0, norms, torch.ones_like(norms))
-    pulled = pulled / norms
-
-    # Add delta_0 as the final row.
-    delta0 = torch.zeros(p, device=device, dtype=torch.float64)
-    delta0[0] = 1.0
-
-    basis = torch.cat([delta0[None, :], pulled], dim=0)  # (n+1, p) = (p, p)
-    names = ["delta_0"] + [f"mul {nm}" for nm in add_names_n]
-    return basis, names, g
+    s = CyclicStructure.multiplicative(p)
+    basis, ci = s.char_basis(device=device)
+    return basis, ci.names, s.generator
 
 
 # ---------- Projection ----------
@@ -165,74 +74,13 @@ def project_2d(
     )
 
 
-# ---------- Character indexing ----------
-
-
-@dataclass(frozen=True)
-class CharIndex:
-    """Canonical map from multiplicative character k to its basis rows.
-
-    Resolves the per-script ``build_basis_indexed`` / ``build_char_basis``
-    variants into one record. For the basis from ``multiplicative_fourier_basis``,
-    ``cos[k]`` is row ``2k`` and ``sin[k]`` is row ``2k+1`` (the Nyquist
-    character k=n/2 has a cos row but no sin row).
-    """
-
-    p: int
-    g: int
-    names: list[str]
-    by_char: dict[int, list[int]]  # k -> [basis row indices] (cos and sin)
-    cos: dict[int, int]  # k -> cos row index
-    sin: dict[int, int]  # k -> sin row index (absent for k = n/2)
-    freqs: list[int]  # sorted character frequencies present
-
-
 def char_index(p: int, device: str = "cpu") -> tuple[torch.Tensor, CharIndex]:
-    """Return ``(basis, CharIndex)`` for ``(Z/p)*``.
-
-    ``basis`` is the (p, p) multiplicative-Fourier basis (double precision);
-    ``CharIndex`` indexes its rows by character. Prime-parametric: frequencies
-    are read from the basis names, so this works for any prime p.
-    """
-    basis, names, g = multiplicative_fourier_basis(p, device=device)
-    by_char: dict[int, list[int]] = {}
-    cos: dict[int, int] = {}
-    sin: dict[int, int] = {}
-    for i, nm in enumerate(names):
-        m = re.match(r"mul (cos|sin) (\d+)", nm)
-        if m:
-            k = int(m.group(2))
-            by_char.setdefault(k, []).append(i)
-            (cos if m.group(1) == "cos" else sin)[k] = i
-    freqs = sorted(by_char)
-    ci = CharIndex(p=p, g=g, names=names, by_char=by_char, cos=cos, sin=sin, freqs=freqs)
-    return basis.double(), ci
+    """``(basis, CharIndex)`` for (Z/p)*: ``CyclicStructure.multiplicative(p).char_basis()``."""
+    return CyclicStructure.multiplicative(p).char_basis(device=device)
 
 
 def fold_frequency(f: int, p: int) -> int:
-    """Real-basis index of complex frequency ``f``.
-
-    The cos/sin basis cannot distinguish frequency f from (p-1)-f, so a complex
-    character at frequency f appears at index ``min(f, (p-1)-f)``. Use this when
-    relating products in the complex character group (where indices add and can
-    exceed (p-1)/2) back to the real-basis indices the analyses report.
-    """
+    """Real-basis index of complex frequency ``f`` of (Z/p)*; see :meth:`CyclicStructure.fold`."""
     n = p - 1
     f %= n
     return min(f, n - f)
-
-
-if __name__ == "__main__":
-    p = 113
-    add_basis, add_names = additive_fourier_basis(p)
-    mul_basis, mul_names, g = multiplicative_fourier_basis(p)
-
-    print(f"Additive basis shape: {add_basis.shape}")
-    add_err = (add_basis @ add_basis.T - torch.eye(p, dtype=torch.float64)).abs().max().item()
-    print(f"  orthonormality error: {add_err:.3e}")
-
-    print(f"\nMultiplicative basis (p={p}, primitive root g={g}):")
-    print(f"  shape: {mul_basis.shape}")
-    mul_err = (mul_basis @ mul_basis.T - torch.eye(p, dtype=torch.float64)).abs().max().item()
-    print(f"  orthonormality error: {mul_err:.3e}")
-    print(f"  first 5 names: {mul_names[:5]}")

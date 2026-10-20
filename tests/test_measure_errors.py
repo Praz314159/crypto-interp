@@ -3,12 +3,14 @@
 import numpy as np
 import pytest
 
+from crypto_interp.data import CyclicStructure
 from crypto_interp.interp import discrete_log_table
 from crypto_interp.measures import errors, kernel_noise
 from crypto_interp.measures.errors import error_profile
 from crypto_interp.measures.kernel import kernel_from_amplitudes
 
 P = 13
+M = CyclicStructure.multiplicative
 
 
 def _kernel_logits(p=P, bias=None):
@@ -16,7 +18,7 @@ def _kernel_logits(p=P, bias=None):
     _, dlog = discrete_log_table(p)
     alpha = np.zeros((p - 1) // 2 + 1)
     alpha[[1, 3]] = [5.0, 2.0]
-    kappa = kernel_from_amplitudes(alpha, p)
+    kappa = kernel_from_amplitudes(alpha, n=p - 1)
     lg = np.array([dlog[x] for x in range(1, p)])
     d = (lg[:, None, None] + lg[None, :, None] - lg[None, None, :]) % (p - 1)
     logits = np.full((p - 1, p - 1, p + 1), -30.0)
@@ -28,7 +30,7 @@ def test_error_profile_finds_planted_errors():
     logits = _kernel_logits()
     a, b = 3, 5  # make (3, 5) wrong: push a different class above the target
     logits[a - 1, b - 1, (a * b + 1) % P] = 100.0
-    e = error_profile(logits, P)
+    e = error_profile(logits, M(P))
     assert e.n_wrong == 1 and e.n_total == (P - 1) ** 2
     assert (
         e.margin[a - 1, b - 1] < 0

@@ -60,8 +60,13 @@ class Run:
         return f"{self.experiment}/{self.name}"
 
     def config(self) -> dict:
-        """Task, architecture and training fields in one flat dict (task fields win)."""
-        return {**self.train_config, **self.model_config, **self.task.to_dict()}
+        """Task, architecture and training fields in one flat dict (task fields win),
+        with ``n``, the order of the task's cyclic group (None for other tasks)."""
+        from ..data import group_order
+
+        task = self.task.to_dict()
+        n = group_order(task["task"], task["p"])
+        return {**self.train_config, **self.model_config, **task, "n": n}
 
     def checkpoints(self) -> list[Path]:
         return checkpoint_paths(self.path)

@@ -1,5 +1,9 @@
 """Session: one model, its dataset and its character basis, with shared forward passes.
 
+The characters are those of the task's cyclic group (``ds.structure``): the
+multiplicative characters of (Z/p)* for ``mul`` and ``mul_units``, the Fourier
+modes of Z/n for ``add``.
+
 A :class:`Session` is the context a measure runs in (see
 :mod:`crypto_interp.measures`). It holds ``(model, ds, task, basis, ci)`` and
 the primitive accessors measures share; the analyses themselves live in
@@ -8,8 +12,8 @@ measures.
 Two lazy properties are built on first access and reused, so several queries
 against the same forward pass pay for it once: ``cache`` (an
 :class:`ActivationCache` over the full p² grid; ``cache.grid(name,
-units=True)`` gives its units view) and ``logits_grid`` (logits over the (p-1)²
-units grid). See :mod:`crypto_interp.interp.grids` for the two grids.
+group=True)`` gives its view over the task's group) and ``logits_grid`` (logits
+over the n² group grid). See :mod:`crypto_interp.interp.grids` for the two grids.
 
 ::
 
@@ -37,19 +41,17 @@ class Session:
         self.ds = ds
         self.task = task or getattr(ds, "task", "mul")
         if basis is None or ci is None:
-            # The default is the multiplicative-character basis on (Z/p)*, which is
-            # only the right basis for ``mul``. Analysing another task in it gives
-            # plausible-looking but meaningless numbers, so refuse.
-            from ..data import MULTIPLICATIVE_TASKS
+            # The default is the character basis of the task's cyclic group. A task
+            # that is not a group operation has none, and analysing it in some other
+            # group's basis gives plausible-looking but meaningless numbers: refuse.
+            if getattr(ds, "structure", None) is None:
+                from ..data import GROUP_TASKS
 
-            if self.task not in MULTIPLICATIVE_TASKS:
                 raise ValueError(
                     f"Session has no default basis for task {self.task!r} "
-                    f"(only {sorted(MULTIPLICATIVE_TASKS)}); pass basis= and ci= explicitly"
+                    f"(only the group tasks {sorted(GROUP_TASKS)}); pass basis= and ci= explicitly"
                 )
-            from .bases import char_index
-
-            basis, ci = char_index(ds.p)
+            basis, ci = ds.structure.char_basis()
         self.basis = basis
         self.ci = ci
         self._cache = None
@@ -81,7 +83,7 @@ class Session:
 
     @property
     def logits_grid(self) -> torch.Tensor:
-        """``(p-1, p-1, vocab)`` final-position logits over the units grid (float64)."""
+        """``(n, n, vocab)`` final-position logits over the group grid (float64)."""
         if self._logits_grid is None:
             from .grids import compute_logits_grid
 
@@ -134,7 +136,7 @@ class Session:
         """Algebraic reference ``cos(θ_k(a) + θ_k(b))`` over the (a, b) grid."""
         from .neurons import reference_cos_signal
 
-        return reference_cos_signal(k, self.ds.p)
+        return reference_cos_signal(k, self.ds.structure)
 
     # ---------- metrics and forward verbs ----------
 

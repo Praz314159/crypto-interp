@@ -33,8 +33,14 @@ The multiplicative group (ℤ/p)* is cyclic of order p − 1. Pick a generator
 g; every nonzero x is g^dlog(x). Its characters are χ_k(x) = e^{iθ_k(x)} with
 θ_k(x) = 2πk·dlog(x)/(p−1), for k = 1, …, (p−1)/2 up to conjugation. They
 turn multiplication into addition of angles, θ_k(ab) = θ_k(a) + θ_k(b), which
-is what the network exploits. χ_k has multiplicative order (p−1)/gcd(k, p−1);
-for p = 113, p − 1 = 112 = 2⁴·7.
+is what the network exploits. χ_k has order (p−1)/gcd(k, p−1); for p = 113,
+p − 1 = 112 = 2⁴·7.
+
+Nothing here depends on p being prime, only on the cyclic group: for addition
+mod n the coordinate is the residue itself, θ_k(x) = 2πk·x/n, and χ_k has order
+n/gcd(k, n). Every measure works on both, in terms of the group order n (see
+[the library](library.md#the-group-and-its-characters)); this page uses
+multiplication mod 113, where n = 112.
 
 ## Characters
 

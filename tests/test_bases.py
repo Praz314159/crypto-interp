@@ -10,7 +10,7 @@ def test_char_index_layout(p):
     n_freq = (n - 1) // 2 + (1 if n % 2 == 0 else 0)
     assert basis.shape == (p, p)
     assert len(ci.freqs) == n_freq
-    assert ci.p == p
+    assert ci.n == n and ci.generator is not None
     for k in ci.freqs:
         assert ci.by_char[k], f"empty rows for k={k}"
         if k in ci.cos:

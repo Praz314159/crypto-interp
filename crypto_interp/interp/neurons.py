@@ -4,73 +4,53 @@ Two clusters of helpers:
 
 - Frequency-matched-bigram decomposition: :func:`matched_bigrams`,
   :func:`compute_per_neuron_frequency_energy`. Sums each neuron's 2D
-  multiplicative-Fourier energy over the 4-bigram pattern of each frequency.
+  character-basis energy over the cos/sin bigrams of each frequency.
 - Output-side cluster identification: :func:`per_neuron_dominant_char`,
   :func:`cluster_signal`, :func:`reference_cos_signal`. Projects each
   neuron's ``W_U @ W_out`` direction onto characters to identify each
   neuron's dominant frequency; reconstructs the cluster's contribution to
   the residual stream on the (a, b) input grid; provides the algebraic
   ground-truth ``cos(θ_k(a)+θ_k(b))`` reference for mechanism verification.
-
-The output-side helpers live here (rather than in ``analysis/``) so the
-intervention/cache layer can depend on them — analyses always depend on
-``interp``, never the other way around.
 """
 
 import numpy as np
 import torch
 
 
-def matched_bigrams(k: int, n: int) -> list[tuple[int, int]]:
-    """The 4 (or 1) basis-index pairs that carry energy for a neuron at frequency k.
-
-    Basis layout (matches :func:`crypto_interp.interp.bases.multiplicative_fourier_basis`):
-        cos k → basis index ``2k``
-        sin k → basis index ``2k+1``
-    For ``k = n/2`` (only when ``n`` is even), sin doesn't exist and we
-    return only the (cos, cos) pair.
-    """
-    ci, si = 2 * k, 2 * k + 1
-    if n % 2 == 0 and k == n // 2:
-        return [(n, n)]
-    return [(ci, ci), (si, si), (ci, si), (si, ci)]
+def matched_bigrams(k: int, ci) -> list[tuple[int, int]]:
+    """The basis-row pairs that carry energy for a neuron at frequency k: every
+    (row, row) pair of χ_k's cos and sin rows (one pair for the cos-only Nyquist k)."""
+    rows = ci.by_char[k]
+    return [(a, b) for a in rows for b in rows]
 
 
 def compute_per_neuron_frequency_energy(
-    coef_2d: torch.Tensor,
-    p: int,
+    coef_2d: torch.Tensor, ci
 ) -> tuple[torch.Tensor, list[int]]:
     """Sum each neuron's energy over the matched-bigram set for every frequency.
 
     Args:
-        coef_2d: (p_basis, p_basis, d_mlp) — 2D multiplicative-Fourier coefficients
-            of each neuron's (p, p) firing pattern.
-        p: prime modulus.
+        coef_2d: (V, V, d_mlp) — 2D character-basis coefficients of each
+            neuron's (V, V) firing pattern.
+        ci: the basis's :class:`CharIndex`.
 
     Returns:
-        out: (n_freqs, d_mlp) — row k is the energy each neuron carries at
-            frequency ``freq_indices[k]``.
-        freq_indices: list of frequency indices (1..(n-1)//2 and n/2 if n even).
+        out: (n_freqs, d_mlp) — row i is the energy each neuron carries at
+            frequency ``ci.freqs[i]``.
+        freq_indices: ``ci.freqs``.
     """
-    n = p - 1
     d_mlp = coef_2d.shape[-1]
-    freq_indices = list(range(1, (n - 1) // 2 + 1))
-    if n % 2 == 0:
-        freq_indices.append(n // 2)
-
-    out = torch.zeros(len(freq_indices), d_mlp, dtype=coef_2d.dtype, device=coef_2d.device)
-    for i, k in enumerate(freq_indices):
-        bigrams = matched_bigrams(k, n)
-        e = sum((coef_2d[a, b] ** 2) for a, b in bigrams)
-        out[i] = e
-    return out, freq_indices
+    out = torch.zeros(len(ci.freqs), d_mlp, dtype=coef_2d.dtype, device=coef_2d.device)
+    for i, k in enumerate(ci.freqs):
+        out[i] = sum((coef_2d[a, b] ** 2) for a, b in matched_bigrams(k, ci))
+    return out, list(ci.freqs)
 
 
 # ---------- output-side cluster identification ----------
 
 
 def per_neuron_dominant_char(
-    W_U: torch.Tensor, W_out: torch.Tensor, basis: torch.Tensor, ci, p: int
+    W_U: torch.Tensor, W_out: torch.Tensor, basis: torch.Tensor, ci, n_values: int
 ):
     """Return ``(char_E[d_mlp, n_chars], dominant_char[d_mlp])`` (1-based char ids).
 
@@ -78,7 +58,7 @@ def per_neuron_dominant_char(
     dominant output character. Used to find the cluster of neurons specialized
     to each character k (mechanism verification, free-rider economy analysis).
     """
-    V = W_U[:, :p].double().T @ W_out.double()  # (p, d_mlp)
+    V = W_U[:, :n_values].double().T @ W_out.double()  # (n_values, d_mlp)
     coef = basis @ V  # (n_basis, d_mlp)
     E = coef**2
     nch = max(ci.freqs)
@@ -90,16 +70,16 @@ def per_neuron_dominant_char(
 
 def cluster_signal(model, ds, cluster_neurons, W_U_k: torch.Tensor) -> np.ndarray:
     """Cluster's projection onto the unembed's character-k direction over the
-    units grid. Returns ``(p-1, p-1)``.
+    group grid. Returns ``(n, n)``.
 
     Reconstructs what the cluster of neurons contributes to the residual stream
     along the direction the unembed reads as χ_k. Comparing this to
     :func:`reference_cos_signal` is the mechanism-verification recipe.
     """
-    from .grids import units_grid_inputs
+    from .grids import group_grid_inputs
 
-    p = ds.p
-    inputs = units_grid_inputs(ds)
+    n = ds.structure.n
+    inputs = group_grid_inputs(ds)
     cache: dict[str, torch.Tensor] = {}
     model.remove_all_hooks()
     model.cache_all(cache)
@@ -112,16 +92,12 @@ def cluster_signal(model, ds, cluster_neurons, W_U_k: torch.Tensor) -> np.ndarra
     W_out = model.blocks[0].mlp.W_out.detach().double()
     cluster_resid = h[:, cluster_neurons] @ W_out[:, cluster_neurons].T
     sig = cluster_resid @ W_U_k.double()
-    return sig.reshape(p - 1, p - 1).cpu().numpy()
+    return sig.reshape(n, n).cpu().numpy()
 
 
-def reference_cos_signal(k: int, p: int) -> np.ndarray:
-    """Algebraic ground truth ``cos(θ_k(a) + θ_k(b))`` over the (a, b) grid for
-    a ∈ {1,...,p-1}, b ∈ {1,...,p-1}, with θ_k(a) = 2πk·dlog(a)/(p-1). The
-    target that a primary χ_k neuron cluster should reproduce."""
-    from .bases import discrete_log_table
-
-    _, dlog = discrete_log_table(p)
-    a_dlog = np.array([dlog[a] for a in range(1, p)])
-    theta = 2 * np.pi * k * a_dlog / (p - 1)
+def reference_cos_signal(k: int, structure) -> np.ndarray:
+    """Algebraic ground truth ``cos(θ_k(a) + θ_k(b))`` over the group grid, with
+    θ_k(a) = 2πk·x(a)/n (x the discrete log for mul). The target that a primary
+    χ_k neuron cluster should reproduce."""
+    theta = structure.theta(k)
     return np.cos(theta[:, None] + theta[None, :])

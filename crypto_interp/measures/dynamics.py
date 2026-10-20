@@ -20,6 +20,7 @@ training record, not one checkpoint's weights.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -63,12 +64,10 @@ def grok_status(run, mem_thresh: float = 0.1, grok_thresh: float = 0.1) -> GrokS
     )
 
 
-def k_class(K, p: int) -> str:
-    """Coarse label of K by its characters' orders."""
-    from ..interp.metrics import order_of
-
-    orders = [order_of(k, p) for k in K]
-    if any(o == p - 1 for o in orders):
+def k_class(K, n: int) -> str:
+    """Coarse label of K by its characters' orders in the group of order n."""
+    orders = [n // math.gcd(int(k), n) for k in K]
+    if any(o == n for o in orders):
         return "primitive"
     if all(o % 2 == 1 for o in orders):
         return "odd"
@@ -99,11 +98,11 @@ def _ratio(E: np.ndarray, mask: np.ndarray) -> np.ndarray:
 def dynamics_markers(
     run, threshold: float = 0.05, ratio: float = 1.5, at_epoch: int = 1500
 ) -> DynamicsMarkers:
-    from ..interp.bases import char_index
     from ..interp.dynamics import bifurcation_step, cliff_step, commit_step
     from ..interp.metrics import char_energy_batch
 
-    p = run.task.p
+    structure = run.task.structure()
+    n = structure.n
     _, test = _loss_history(run)
     cliff = cliff_step(test)
     empty = np.zeros(0)
@@ -121,7 +120,7 @@ def dynamics_markers(
 
     if mask.all():  # every character is in K: there is no "rest" to outgrow
         return DynamicsMarkers(
-            K, k_class(K, p), cliff, None, None, None, None, epochs, np.full(len(epochs), np.nan)
+            K, k_class(K, n), cliff, None, None, None, None, epochs, np.full(len(epochs), np.nan)
         )
     bif = bifurcation_step(E, mask, ratio=ratio)
     com = commit_step(E, list(K), mode="subset")
@@ -132,14 +131,14 @@ def dynamics_markers(
     fine_path = run.path / "fine_grained.pt"
     if fine_path.exists():
         fg = torch.load(fine_path, weights_only=False)
-        basis, ci = char_index(p)
-        E_fine = char_energy_batch(fg["W_E"][:, :, :p], basis, ci)
+        basis, ci = structure.char_basis()
+        E_fine = char_energy_batch(fg["W_E"][:, :, : structure.n_values], basis, ci)
         step = bifurcation_step(E_fine, mask, ratio=ratio)
         bif_fine = None if step is None else int(fg["epochs"][step])
 
     return DynamicsMarkers(
         K=K,
-        K_class=k_class(K, p),
+        K_class=k_class(K, n),
         cliff_epoch=cliff,
         bifurcation_epoch=None if bif is None else int(epochs[bif]),
         commit_epoch=None if com is None else int(epochs[com]),

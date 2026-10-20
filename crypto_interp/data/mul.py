@@ -11,6 +11,7 @@ Discrete Log Clock"). It keeps the same tokens, so token 0 never appears.
 """
 
 from .base import Dataset, assemble
+from .structure import CyclicStructure
 
 
 def build(p: int, frac_train: float = 0.3, seed: int = 0) -> Dataset:
@@ -34,6 +35,7 @@ def _build(p: int, frac_train: float, seed: int, task: str, values: range) -> Da
         eq_token=p,
         frac_train=frac_train,
         seed=seed,
+        structure=CyclicStructure.multiplicative(p),
     )
 
 

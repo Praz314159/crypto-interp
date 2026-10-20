@@ -15,9 +15,11 @@ import numpy as np
 from .kernel import REGIME_COLOR
 
 
-def profile(e, title: str = ""):
-    """``e`` is an :class:`~crypto_interp.measures.ErrorProfile`."""
-    p = len(e.err_by_target)
+def profile(e, structure, title: str = ""):
+    """``e`` is an :class:`~crypto_interp.measures.ErrorProfile`; ``structure`` the
+    run's group (``run.task.structure()``), whose tokens index its per-token arrays."""
+    tokens = structure.token_array
+    t_lo, t_hi = int(tokens.min()), int(tokens.max()) + 1  # token axis
     fig, axes = plt.subplots(2, 2, figsize=(13, 9.6))
 
     ax = axes[0][0]
@@ -56,14 +58,15 @@ def profile(e, title: str = ""):
     ax.grid(True, alpha=0.3)
 
     ax = axes[1][0]
-    ax.imshow(e.wrong, cmap="Reds", aspect="auto", extent=[1, p, p, 1], interpolation="nearest")
-    ax.set(xlabel="b", ylabel="a", title=f"where errors happen ({e.n_wrong} / {(p - 1) ** 2})")
+    extent = [t_lo, t_hi, t_hi, t_lo]
+    ax.imshow(e.wrong, cmap="Reds", aspect="auto", extent=extent, interpolation="nearest")
+    ax.set(xlabel="b", ylabel="a", title=f"where errors happen ({e.n_wrong} / {e.wrong.size})")
 
     ax = axes[1][1]
-    x = np.arange(1, p)
+    x = tokens
     ax.bar(x - 0.2, e.err_by_a, width=0.4, color="steelblue", label="as a")
     ax.bar(x + 0.2, e.err_by_b, width=0.4, color="orange", label="as b")
-    ax.set(xlabel="token", ylabel="error rate", title="per-token error rate", xlim=(0, p))
+    ax.set(xlabel="token", ylabel="error rate", title="per-token error rate", xlim=(t_lo - 1, t_hi))
     ax.legend()
     fig.tight_layout()
     return fig

@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 
+from crypto_interp.data import CyclicStructure
 from crypto_interp.interp import discrete_log_table, fourier_spectrum_1d, reduce_to_diff
+
+M = CyclicStructure.multiplicative
 
 
 def _synthetic_grid(p, k):
@@ -22,8 +25,8 @@ def _synthetic_grid(p, k):
 def test_reduce_to_diff_modes_agree_and_recover(p, k):
     full = _synthetic_grid(p, k)
     vals = full[:, :, 1:p]  # value-restricted columns c=1..p-1
-    f_full = reduce_to_diff(full, p, value_axis="full")
-    f_vals = reduce_to_diff(vals, p, value_axis="values")
+    f_full = reduce_to_diff(full, M(p), value_axis="full")
+    f_vals = reduce_to_diff(vals, M(p), value_axis="values")
     # the off-by-one regression: both conventions must agree exactly
     assert np.allclose(f_full, f_vals, atol=1e-9)
     # and recover a clean cosine at frequency k
@@ -38,8 +41,8 @@ def test_reduce_to_diff_modes_agree_and_recover(p, k):
 
 def test_reduce_to_diff_shape_guards():
     with pytest.raises(ValueError):
-        reduce_to_diff(np.zeros((112, 112, 50)), 113, value_axis="full")  # wrong vocab width
+        reduce_to_diff(np.zeros((112, 112, 50)), M(113), value_axis="full")  # wrong vocab width
     with pytest.raises(ValueError):
-        reduce_to_diff(np.zeros((112, 112, 113)), 113, value_axis="values")  # not p-1 columns
+        reduce_to_diff(np.zeros((112, 112, 113)), M(113), value_axis="values")  # not n columns
     with pytest.raises(ValueError):
-        reduce_to_diff(np.zeros((112, 112)), 113)  # not 3-D
+        reduce_to_diff(np.zeros((112, 112)), M(113))  # not 3-D

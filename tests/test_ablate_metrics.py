@@ -42,7 +42,7 @@ def test_char_energy_matches_per_frequency_list():
     torch.manual_seed(1)
     W = torch.randn(24, p, dtype=torch.float64)
     ce = char_energy(W, basis, ci)
-    ref = np.array(per_frequency_energy_from_embedding(W, basis, p))
+    ref = np.array(per_frequency_energy_from_embedding(W, basis, ci))
     assert np.allclose(ce[: len(ref)], ref, atol=1e-9)
 
 

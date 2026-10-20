@@ -1,10 +1,12 @@
-"""1-D reductions of (a, b, c) signal grids over the discrete-log difference.
+"""1-D reductions of (a, b, c) signal grids over the group-coordinate difference.
 
-The Delta_k pipeline reduces a logit/contribution grid to a function of
-``Dlog = (dlog(c) - dlog(a*b)) mod (p-1)``. Two earlier per-script copies
-disagreed on the value-token column convention (full-vocab column == value c,
-vs value-restricted column == c-1) -- the recurring off-by-one. Here it lives
-in ONE function with an explicit ``value_axis`` flag; both conventions, fed
+The Delta_k pipeline reduces a logit/contribution grid on the group grid to a
+function of ``D = (x(c) − x(a) − x(b)) mod n``, the coordinate distance of the
+candidate c from the answer a∘b (for mul, the discrete-log difference
+``dlog(c) − dlog(ab)``). Two earlier per-script copies disagreed on the
+value-token column convention (full-vocab column == token c, vs group-restricted
+column == the c-th group token) -- the recurring off-by-one. Here it lives in
+ONE function with an explicit ``value_axis`` flag; both conventions, fed
 correctly-shaped inputs, produce identical results.
 """
 
@@ -12,61 +14,54 @@ from __future__ import annotations
 
 import numpy as np
 
-from .bases import discrete_log_table
 
-
-def reduce_to_ab(delta_abc, p: int) -> np.ndarray:
-    """Average a (p-1, p-1, C) grid over (a, b) pairs with the same product ab.
-    Returns (p-1, C) indexed by ``ab-1`` on axis 0."""
+def reduce_to_ab(delta_abc, structure) -> np.ndarray:
+    """Average an (n, n, C) group-grid array over (a, b) pairs with the same product.
+    Returns (n, C), indexed on axis 0 by the product's position among the group tokens."""
     arr = np.asarray(delta_abc, dtype=np.float64)
-    n = p - 1
-    a = np.arange(1, p)
-    ab = (a[:, None] * a[None, :]) % p  # (n, n), in 1..p-1
+    n = structure.n
+    position = np.empty(structure.n_values, dtype=np.int64)
+    position[structure.token_array] = np.arange(n)
+    ab = position[structure.product()]  # (n, n)
     out = np.zeros((n, arr.shape[-1]))
     cnt = np.zeros(n)
-    np.add.at(out, ab.ravel() - 1, arr.reshape(-1, arr.shape[-1]))
-    np.add.at(cnt, ab.ravel() - 1, 1.0)
+    np.add.at(out, ab.ravel(), arr.reshape(-1, arr.shape[-1]))
+    np.add.at(cnt, ab.ravel(), 1.0)
     return out / np.where(cnt > 0, cnt, 1.0)[:, None]
 
 
-def reduce_to_diff(delta_abc, p: int, *, value_axis: str = "full") -> np.ndarray:
-    """Reduce a (p-1, p-1, C) grid over (a, b, c) to f(Dlog), length p-1.
+def reduce_to_diff(delta_abc, structure, *, value_axis: str = "full") -> np.ndarray:
+    """Reduce an (n, n, C) group-grid array over (a, b, c) to f(D), length n.
 
     ``value_axis``:
-      - ``"full"``   : last axis is the full vocab (C == p or p+1); column index
-                       equals the value c, so columns 1..p-1 are used (c=0 dropped).
-      - ``"values"`` : last axis is already restricted to c=1..p-1 (C == p-1);
-                       column j corresponds to value j+1.
+      - ``"full"``   : last axis is the full vocab (C == V or V+1 for V value
+                       tokens); column index equals the token c, and the group
+                       tokens' columns are used.
+      - ``"values"`` : last axis is already restricted to the group tokens
+                       (C == n); column j is the j-th group token.
     Both modes return the SAME result on correctly-shaped inputs.
     """
     arr = np.asarray(delta_abc, dtype=np.float64)
     if arr.ndim != 3:
-        raise ValueError(f"expected a 3-D (p-1, p-1, C) grid, got shape {arr.shape}")
-    n = p - 1
+        raise ValueError(f"expected a 3-D (n, n, C) grid, got shape {arr.shape}")
+    n, V = structure.n, structure.n_values
     C = arr.shape[-1]
 
-    _, dlog = discrete_log_table(p)
-    dlog_of_value = np.array([dlog[v] for v in range(1, p)])  # index v-1 -> dlog(v)
-
     if value_axis == "full":
-        if C not in (p, p + 1):
-            raise ValueError(f"value_axis='full' expects vocab columns (p or p+1), got C={C}")
-        col_idx = np.arange(1, p)  # columns 1..p-1 are values 1..p-1
+        if C not in (V, V + 1):
+            raise ValueError(f"value_axis='full' expects vocab columns (V or V+1), got C={C}")
+        col_idx = structure.token_array
     elif value_axis == "values":
         if C != n:
-            raise ValueError(f"value_axis='values' expects p-1 columns, got C={C}")
-        col_idx = np.arange(n)  # column j -> value j+1
+            raise ValueError(f"value_axis='values' expects n columns, got C={C}")
+        col_idx = np.arange(n)
     else:
         raise ValueError(f"value_axis must be 'full' or 'values', got {value_axis!r}")
 
-    sub = arr[:, :, col_idx]  # (n, n, n), last axis = c=1..p-1 in order
-    j_c = dlog_of_value  # (n,) dlog of value c=1..p-1
-
-    a = np.arange(1, p)
-    ab = (a[:, None] * a[None, :]) % p  # (n, n)
-    j_ab = dlog_of_value[ab - 1]  # (n, n)
-
-    delta = (j_c[None, None, :] - j_ab[:, :, None]) % n  # (n, n, n)
+    sub = arr[:, :, col_idx]  # (n, n, n), last axis = the group tokens in order
+    x = structure.x
+    x_ab = (x[:, None] + x[None, :]) % n  # (n, n): coordinate of the answer
+    delta = (x[None, None, :] - x_ab[:, :, None]) % n  # (n, n, n)
     out = np.zeros(n)
     cnt = np.zeros(n)
     np.add.at(out, delta.ravel(), sub.ravel())

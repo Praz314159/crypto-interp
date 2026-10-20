@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 class ExperimentConfig:
     # --- Task / data ---
     task: str  # see crypto_interp.data.available_tasks()
-    p: int  # prime modulus
+    p: int  # the modulus: prime for the mul tasks, any n for add (the group Z/n)
     frac_train: float = 0.3
     seed: int = 0
 

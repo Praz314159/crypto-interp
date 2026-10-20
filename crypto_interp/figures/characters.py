@@ -5,9 +5,12 @@
 - :func:`delta_spectrum`: for each k in K, the frequencies its ablation
   destroys (a helper's peak sits off k).
 - :func:`delta`: one character's ablation contribution Δ_k over (ab, c), in
-  natural and dlog order, and reduced to the dlog offset.
+  natural and coordinate (dlog) order, and reduced to the coordinate offset.
 - :func:`cluster`: one character's neuron-cluster output beside the reference
-  cos(θ_k(a) + θ_k(b)), in natural and dlog order.
+  cos(θ_k(a) + θ_k(b)), in natural and coordinate (dlog) order.
+
+The single-run figures take the run's group ``structure`` (from
+``run.task.structure()``) for its coordinate order and labels.
 - :func:`fourier2d`: MLP-output energy over character pairs, and its diagonal.
 """
 
@@ -15,8 +18,6 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from ..measures.characters import dlog_order
 
 
 def _order_colors(orders):
@@ -118,25 +119,35 @@ def delta_spectrum(h, title: str = ""):
     return fig
 
 
-def delta(h, k: int, p: int):
+def _offset_labels(structure):
+    """(offset symbol, its definition, the group order's symbol) for axis labels."""
+    if structure.coord_name == "dlog":
+        return "Δlog", "Δlog = log c − log ab", "(p−1)"
+    return "Δx", "Δx = c − (a + b) mod n", "n"
+
+
+def delta(h, k: int, structure):
     """Δ_k(ab, c) for one k in ``h.K``."""
     j = h.K.index(k)
     f_ab, f_diff = h.delta_ab[j], h.delta_diff[j]
-    idx = dlog_order(p)
-    d = np.arange(p - 1)
-    ref = np.cos(2 * np.pi * k * d / (p - 1))
+    idx = structure.coord_order
+    n = structure.n
+    D, D_def, n_sym = _offset_labels(structure)
+    order_lab = f"{structure.coord_name} order"
+    d = np.arange(n)
+    ref = np.cos(2 * np.pi * k * d / n)
     vmax = float(np.abs(f_ab).max())
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    for ax, data, lab in [(axes[0], f_ab, "natural"), (axes[1], f_ab[idx][:, idx], "dlog order")]:
+    for ax, data, lab in [(axes[0], f_ab, "natural"), (axes[1], f_ab[idx][:, idx], order_lab)]:
         ax.imshow(data, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="equal", origin="upper")
         ax.set(xlabel=f"c ({lab})", ylabel=f"ab ({lab})", title=f"Δ_{k}(ab, c), {lab}")
     scale = (f_diff @ ref) / (ref @ ref)
-    axes[2].plot(d, f_diff, "b-", lw=1.6, label=f"Δ_{k}(Δlog)")
-    axes[2].plot(d, scale * ref, "r--", lw=1.4, label=f"{scale:.2e}·cos(2π{k}Δlog/(p−1))")
+    axes[2].plot(d, f_diff, "b-", lw=1.6, label=f"Δ_{k}({D})")
+    axes[2].plot(d, scale * ref, "r--", lw=1.4, label=f"{scale:.2e}·cos(2π{k}{D}/{n_sym})")
     axes[2].set(
-        xlabel="Δlog = log c − log ab",
+        xlabel=D_def,
         ylabel=f"mean Δ_{k}",
-        title=f"reduced to the dlog offset; corr {h.delta_corr[j]:+.3f}",
+        title=f"reduced to the {structure.coord_name} offset; corr {h.delta_corr[j]:+.3f}",
     )
     axes[2].legend(fontsize=8)
     axes[2].grid(True, alpha=0.3)
@@ -144,16 +155,17 @@ def delta(h, k: int, p: int):
     return fig
 
 
-def cluster(nc, k: int, p: int):
+def cluster(nc, k: int, structure):
     """Neuron cluster for one k in ``nc.K`` against its reference."""
     j = nc.K.index(k)
-    idx = dlog_order(p)
+    idx = structure.coord_order
+    order_lab = f"{structure.coord_name} order"
     fig, axes = plt.subplots(2, 2, figsize=(11, 10))
     for row, (data, name) in enumerate(
         [(nc.signal[j], "cluster output"), (nc.reference[j], "cos(θ_k(a) + θ_k(b))")]
     ):
         vmax = float(np.abs(data).max()) or 1.0
-        for col, (d, lab) in enumerate([(data, "natural"), (data[idx][:, idx], "dlog order")]):
+        for col, (d, lab) in enumerate([(data, "natural"), (data[idx][:, idx], order_lab)]):
             ax = axes[row, col]
             ax.imshow(d, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="equal", origin="upper")
             ax.set(title=f"{name}, {lab}", xlabel=f"b ({lab})", ylabel=f"a ({lab})")

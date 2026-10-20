@@ -2,7 +2,8 @@
 
 For each character χ_k in K, the embedding of token x should lie on a
 clock: ``W_E[:, x] ≈ Σ_k C_k cos θ_k(x) + S_k sin θ_k(x)`` with
-``θ_k(x) = 2πk·dlog(x)/(p−1)``. :func:`fit_clock` fits the C_k, S_k by least
+``θ_k(x) = 2πk·x(t)/n``, x the token's coordinate in the task's group (its
+discrete log for mul mod p, where n = p − 1). :func:`fit_clock` fits the C_k, S_k by least
 squares over the tokens. That is the run's own clock, so a perfect clock scores
 zero whatever its eccentricity. Three measures build on it:
 
@@ -31,8 +32,8 @@ TAU = 2 * np.pi
 @dataclass
 class ClockFit:
     K: tuple[int, ...]
-    W: np.ndarray  # (d_model, p−1) value-token embeddings, tokens 1..p−1
-    theta: np.ndarray  # (|K|, p−1) ideal angles θ_k(x)
+    W: np.ndarray  # (d_model, n) embeddings of the group tokens, in token order
+    theta: np.ndarray  # (|K|, n) ideal angles θ_k(x)
     C: np.ndarray  # (|K|, d_model) cosine directions
     S: np.ndarray  # (|K|, d_model) sine directions
 
@@ -46,7 +47,7 @@ class ClockFit:
         return Q
 
     def plane_deviation(self) -> np.ndarray:
-        """(|K|, p−1): the norm of each token's residual from the full fitted clock,
+        """(|K|, n): the norm of each token's residual from the full fitted clock,
         projected into each clock plane. Zero for every token of a perfect clock.
 
         (The residual is taken against all clocks at once. Comparing a token with
@@ -59,16 +60,12 @@ class ClockFit:
         )
 
 
-def fit_clock(W_E: np.ndarray, K, p: int) -> ClockFit:
-    """Least-squares clock fit of ``W_E`` (d_model, ≥ p) on characters ``K``."""
-    from ..interp.bases import discrete_log_table
-
+def fit_clock(W_E: np.ndarray, K, structure) -> ClockFit:
+    """Least-squares clock fit of the group tokens' columns of ``W_E`` on characters ``K``."""
     K = tuple(sorted(int(k) for k in K))
-    _, dlog = discrete_log_table(p)
-    lg = np.array([dlog[x] for x in range(1, p)])
-    W = np.asarray(W_E, dtype=np.float64)[:, 1:p]
-    theta = TAU * np.outer(K, lg) / (p - 1)
-    Phi = np.concatenate([np.cos(theta), np.sin(theta)], axis=0)  # (2|K|, p−1)
+    W = np.asarray(W_E, dtype=np.float64)[:, structure.token_array]
+    theta = TAU * np.outer(K, structure.x) / structure.n
+    Phi = np.concatenate([np.cos(theta), np.sin(theta)], axis=0)  # (2|K|, n)
     coef, *_ = np.linalg.lstsq(Phi.T, W.T, rcond=None)  # (2|K|, d_model)
     return ClockFit(K, W, theta, coef[: len(K)], coef[len(K) :])
 
@@ -77,7 +74,7 @@ def _session_fit(S, K):
     from .characters import support
 
     K = support(S, K)
-    return fit_clock(S.model.embed.W_E.detach().double().cpu().numpy(), K, S.ds.p)
+    return fit_clock(S.model.embed.W_E.detach().double().cpu().numpy(), K, S.ds.structure)
 
 
 # --------------------------------------------------------------------------
@@ -89,10 +86,10 @@ def _session_fit(S, K):
 class ClockResiduals:
     K: tuple[int, ...]
     median_in_dev: float
-    in_dev: np.ndarray  # (p−1,) in-subspace deviation from the fitted clock / |ideal|
-    plane_dev: np.ndarray  # (|K|, p−1) deviation within each clock plane
-    worst_k: np.ndarray  # (p−1,) the character whose plane each token deviates most in
-    leak: np.ndarray  # (p−1,) fraction of the embedding outside every clock plane
+    in_dev: np.ndarray  # (n,) in-subspace deviation from the fitted clock / |ideal|
+    plane_dev: np.ndarray  # (|K|, n) deviation within each clock plane
+    worst_k: np.ndarray  # (n,) the character whose plane each token deviates most in
+    leak: np.ndarray  # (n,) fraction of the embedding outside every clock plane
 
 
 @measure("clock_residuals", version=1)
@@ -136,13 +133,14 @@ class ClockDefect:
 
 def _implicated(S, K):
     fit = _session_fit(S, K)
-    err = error_profile(S.logits_grid.detach().cpu().numpy(), S.ds.p)
+    err = error_profile(S.logits_grid.detach().cpu().numpy(), S.ds.structure)
     pd = fit.plane_deviation()
     z = pd / (np.median(pd, axis=1, keepdims=True) + 1e-12)
     defect = list(err.defect_tokens)
     kstar = None
     if defect:
-        j = Counter(int(z[:, x - 1].argmax()) for x in defect).most_common(1)[0][0]
+        pos = S.ds.structure.position
+        j = Counter(int(z[:, pos[x]].argmax()) for x in defect).most_common(1)[0][0]
         kstar = fit.K[j]
     return fit, err, z, defect, kstar
 
@@ -154,14 +152,15 @@ def clock_defect(S, K=None) -> ClockDefect:
     fit, _, z, defect, kstar = _implicated(S, K)
     if kstar is None:
         return ClockDefect(fit.K, (), None, (), None, (), None)
-    idx = np.array(defect) - 1
+    pos = S.ds.structure.position
+    idx = pos[np.array(defect)]
     R = np.abs(np.mean(np.exp(1j * fit.theta[:, idx]), axis=1))  # per clock
     j = fit.K.index(kstar)
     return ClockDefect(
         K=fit.K,
         defect_tokens=tuple(defect),
         kstar=kstar,
-        plane_z_kstar=tuple(sorted((float(z[j, x - 1]) for x in defect), reverse=True)),
+        plane_z_kstar=tuple(sorted((float(z[j, pos[x]]) for x in defect), reverse=True)),
         arc_R=float(R[j]),
         arc_R_by_k=tuple(float(r) for r in R),
         arc_R_null=float(0.886 / np.sqrt(len(defect))),
@@ -193,7 +192,7 @@ def clock_repair(S, K=None, seed: int = 0) -> ClockRepair:
     fit, err, _, defect, kstar = _implicated(S, K)
     if kstar is None:
         return ClockRepair(None, 0, err.n_wrong, None, None, None)
-    p = S.ds.p
+    s = S.ds.structure
     j = fit.K.index(kstar)
     Q = fit.plane(j)
     W_E = S.model.embed.W_E.detach()
@@ -201,14 +200,15 @@ def clock_repair(S, K=None, seed: int = 0) -> ClockRepair:
     def wrong_after_moving(tokens) -> int:
         W = W_E.double().cpu().numpy().copy()
         for x in tokens:
-            ideal = fit.C[j] * np.cos(fit.theta[j, x - 1]) + fit.S[j] * np.sin(fit.theta[j, x - 1])
+            th = fit.theta[j, s.position[x]]
+            ideal = fit.C[j] * np.cos(th) + fit.S[j] * np.sin(th)
             W[:, x] += Q @ (Q.T @ (ideal - W[:, x]))
         patched = torch.tensor(W, dtype=W_E.dtype, device=W_E.device)
         lg = compute_logits_grid(S.model, S.ds, W_E_override=patched).cpu().numpy()
-        return error_profile(lg, p).n_wrong
+        return error_profile(lg, s).n_wrong
 
     rng = np.random.default_rng(seed)
-    clean = [x for x in range(1, p) if x not in defect]
+    clean = [x for x in s.tokens if x not in defect]
     n_control = min(len(defect), len(clean))  # a failed run can have more defect than clean
     return ClockRepair(
         kstar=kstar,
@@ -218,7 +218,7 @@ def clock_repair(S, K=None, seed: int = 0) -> ClockRepair:
         wrong_patch_random_clean=wrong_after_moving(
             rng.choice(clean, size=n_control, replace=False)
         ),
-        wrong_straighten_clock=wrong_after_moving(range(1, p)),
+        wrong_straighten_clock=wrong_after_moving(s.tokens),
     )
 
 
@@ -238,6 +238,7 @@ def token_table(target):
 
     rows = []
     for run in _runs(target):
+        tokens = run.task.structure().tokens
         ckpt = run.latest()
         e, c, kn = errors.at(ckpt), clock_residuals.at(ckpt), kernel_noise.at(ckpt)
         min_margin = np.minimum(e.margin.min(axis=1), e.margin.min(axis=0))
@@ -246,10 +247,11 @@ def token_table(target):
                 {
                     "run": run.id,
                     "p": run.task.p,
+                    "n": len(tokens),
                     "seed": run.task.seed,
                     "regime": kn.regime,
                     "n_wrong_run": e.n_wrong,
-                    "token": i + 1,
+                    "token": tokens[i],
                     "err_a": float(e.err_by_a[i]),
                     "err_b": float(e.err_by_b[i]),
                     "min_margin": float(min_margin[i]),

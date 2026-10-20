@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pytest
 
+from crypto_interp.data import CyclicStructure
 from crypto_interp.interp import discrete_log_table
 from crypto_interp.measures.kernel import (
     amplitudes_from_kernel,
@@ -19,29 +20,28 @@ from crypto_interp.measures.kernel import (
 )
 
 P = 13
+M = CyclicStructure.multiplicative
 
 
 def test_amplitudes_round_trip():
     alpha = np.zeros((P - 1) // 2 + 1)
     alpha[[0, 2, 6]] = [0.5, 3.0, -1.0]
-    kappa = kernel_from_amplitudes(alpha, P)
-    assert np.allclose(amplitudes_from_kernel(kappa, P), alpha)
+    kappa = kernel_from_amplitudes(alpha, n=P - 1)
+    assert np.allclose(amplitudes_from_kernel(kappa), alpha)
 
 
-def test_pure_kernel_logits_recover_the_kernel_and_its_loss():
-    """Logits that depend only on the dlog offset: κ_obs is that kernel, and the
-    empirical loss equals the closed-form kernel loss."""
-    _, dlog = discrete_log_table(P)
-    alpha = np.zeros((P - 1) // 2 + 1)
+@pytest.mark.parametrize("s", [M(P), CyclicStructure.additive(12)], ids=["mul13", "add12"])
+def test_pure_kernel_logits_recover_the_kernel_and_its_loss(s):
+    """Logits that depend only on the group offset x(a) + x(b) − x(c): κ_obs is that
+    kernel, and the empirical loss equals the closed-form kernel loss."""
+    alpha = np.zeros(s.n // 2 + 1)
     alpha[[1, 4]] = [4.0, 2.0]
-    kappa = kernel_from_amplitudes(alpha, P)
-    lg = np.array([dlog[x] for x in range(1, P)])
-    d = (lg[:, None, None] + lg[None, :, None] - lg[None, None, :]) % (P - 1)
-    logits = np.full((P - 1, P - 1, P + 1), -50.0)
-    logits[:, :, 1:P] = kappa[d]
+    kappa = kernel_from_amplitudes(alpha, n=s.n)
+    logits = np.full((s.n, s.n, s.n_values + 1), -50.0)
+    logits[:, :, s.token_array] = kappa[s.offsets()]
 
-    assert np.allclose(observed_kernel(logits, P, dlog), kappa)
-    assert empirical_loss(logits, P) == pytest.approx(kernel_loss(kappa), rel=1e-9)
+    assert np.allclose(observed_kernel(logits, s), kappa)
+    assert empirical_loss(logits, s) == pytest.approx(kernel_loss(kappa), rel=1e-9)
 
 
 def test_memorized_pairs_cannot_fake_the_held_out_kernel():
@@ -55,22 +55,22 @@ def test_memorized_pairs_cannot_fake_the_held_out_kernel():
     logits = np.zeros((P - 1, P - 1, P + 1))
     np.put_along_axis(logits, ((a * b) % P)[..., None], np.where(train, 40.0, 0.0)[..., None], -1)
 
-    assert kernel_loss(observed_kernel(logits, P, dlog)) < 1e-2  # looks algorithmic
-    held_out = kernel_loss(observed_kernel(logits, P, dlog, ~train))
+    assert kernel_loss(observed_kernel(logits, M(P))) < 1e-2  # looks algorithmic
+    held_out = kernel_loss(observed_kernel(logits, M(P), ~train))
     assert held_out == pytest.approx(np.log(P - 1))
-    assert empirical_loss(logits, P, ~train) == pytest.approx(np.log(P))
-    assert empirical_loss(logits, P, train) < 1e-12
+    assert empirical_loss(logits, M(P), ~train) == pytest.approx(np.log(P))
+    assert empirical_loss(logits, M(P), train) < 1e-12
 
 
 def test_crt_rule():
     # p = 113: p-1 = 112 = 2^4 * 7. K = {2, 4} (seed 9) misses the odd part of the 2-group.
-    assert crt_gcd([2, 4], 113) == 2 and crt_floor([2, 4], 113) == pytest.approx(math.log(2))
-    assert crt_gcd([3, 10, 20, 51], 113) == 1
-    assert classify_regime([2, 4], 113, L_emp=1.4, L_sym=1.3) == "CRT-fail"
-    assert classify_regime([3, 10], 113, L_emp=1e-5, L_sym=1e-6) == "grokked"
-    assert classify_regime([3, 10], 113, L_emp=0.05, L_sym=1e-4) == "algorithmic-but-noisy"
-    assert classify_regime([3, 10], 113, L_emp=0.5, L_sym=0.4) == "intermediate"
-    assert classify_regime([], 113, L_emp=4.7, L_sym=4.7) == "intermediate"
+    assert crt_gcd([2, 4], n=112) == 2 and crt_floor([2, 4], n=112) == pytest.approx(math.log(2))
+    assert crt_gcd([3, 10, 20, 51], n=112) == 1
+    assert classify_regime([2, 4], n=112, L_emp=1.4, L_sym=1.3) == "CRT-fail"
+    assert classify_regime([3, 10], n=112, L_emp=1e-5, L_sym=1e-6) == "grokked"
+    assert classify_regime([3, 10], n=112, L_emp=0.05, L_sym=1e-4) == "algorithmic-but-noisy"
+    assert classify_regime([3, 10], n=112, L_emp=0.5, L_sym=0.4) == "intermediate"
+    assert classify_regime([], n=112, L_emp=4.7, L_sym=4.7) == "intermediate"
 
 
 def test_crt_floor_bounds_any_kernel_supported_on_K():
@@ -81,7 +81,8 @@ def test_crt_floor_bounds_any_kernel_supported_on_K():
         for _ in range(20):
             alpha = np.zeros((p - 1) // 2 + 1)
             alpha[K] = rng.normal(scale=10.0, size=len(K))
-            assert kernel_loss(kernel_from_amplitudes(alpha, p)) >= crt_floor(K, p) - 1e-9
+            kappa = kernel_from_amplitudes(alpha, n=p - 1)
+            assert kernel_loss(kappa) >= crt_floor(K, n=p - 1) - 1e-9
 
 
 def test_reference_model_is_grokked(S):

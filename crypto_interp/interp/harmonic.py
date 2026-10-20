@@ -12,30 +12,30 @@ from __future__ import annotations
 
 import numpy as np
 
-from .bases import CharIndex, fold_frequency
+from .bases import CharIndex
 from .grids import compute_logits_grid
 from .reductions import fourier_spectrum_1d, reduce_to_diff
 
 
-def helper_multiplier(helper: int, primary: int, p: int, max_mult: int = 8) -> int | None:
+def helper_multiplier(helper: int, primary: int, structure, max_mult: int = 8) -> int | None:
     """Smallest j>=2 such that chi_primary^j (= chi_{j*primary}) folds to the
     helper's real-basis index. j=2 is the Sylow-2 doubling (squared feature),
     j=3 a Sylow-3 rider, etc. Returns None if no small power matches.
 
-    Fold-aware: compares ``fold_frequency(j*primary)`` to ``fold_frequency(helper)``
-    so a doubling whose raw index 2*primary exceeds (p-1)/2 (and folds back) is
+    Fold-aware: compares ``structure.fold(j*primary)`` to ``structure.fold(helper)``
+    so a doubling whose raw index 2*primary exceeds n/2 (and folds back) is
     still recognized as a doubling.
     """
-    h = fold_frequency(helper, p)
+    h = structure.fold(helper)
     for j in range(2, max_mult + 1):
-        if fold_frequency(j * primary, p) == h:
+        if structure.fold(j * primary) == h:
             return j
     return None
 
 
 def delta_k(model, ds, ci: CharIndex, basis, k: int, *, logits_full=None) -> np.ndarray:
     """Exact contribution of character k to the logits:
-    ``logit_full - logit_ablated``, shape (p-1, p-1, vocab) as a numpy array.
+    ``logit_full - logit_ablated``, shape (n, n, vocab) over the group grid.
     Pass ``logits_full`` (a torch grid) to avoid recomputing it across calls."""
     from .interventions import ablate_char_w
 
@@ -47,10 +47,10 @@ def delta_k(model, ds, ci: CharIndex, basis, k: int, *, logits_full=None) -> np.
 
 def delta_k_spectrum(model, ds, ci: CharIndex, basis, k: int, *, logits_full=None):
     """Return ``(f_diff, energy, dominant_freq)`` for character k: the 1-D
-    Dlog reduction of Delta_k, its Fourier energy spectrum, and the dominant
+    coordinate-difference reduction of Delta_k, its Fourier energy spectrum, and the dominant
     frequency m (1-based)."""
     grid = delta_k(model, ds, ci, basis, k, logits_full=logits_full)
-    f_diff = reduce_to_diff(grid, ds.p, value_axis="full")
+    f_diff = reduce_to_diff(grid, ds.structure, value_axis="full")
     energy = fourier_spectrum_1d(f_diff)
     dominant = int(energy.argmax() + 1)
     return f_diff, energy, dominant
@@ -66,6 +66,6 @@ def find_primary_helper_pairs(model, ds, ci: CharIndex, basis, K, max_mult: int 
     for k in K:
         _, energy, dominant = delta_k_spectrum(model, ds, ci, basis, k, logits_full=logits_full)
         if dominant != k:
-            mult = helper_multiplier(k, dominant, ds.p, max_mult=max_mult)
+            mult = helper_multiplier(k, dominant, ds.structure, max_mult=max_mult)
             pairs.append((k, dominant, mult, float(energy.max())))
     return pairs
