@@ -12,7 +12,7 @@ class TaskSpec:
     """A task and its train/test split. ``build()`` is deterministic in these fields."""
 
     task: str
-    p: int
+    p: int  # the modulus: prime for the mul tasks, any n for add (the group Z/n)
     frac_train: float = 0.3
     seed: int = 0
 
@@ -22,6 +22,13 @@ class TaskSpec:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def structure(self):
+        """The task's :class:`~crypto_interp.data.structure.CyclicStructure`
+        (group tasks only), without building the dataset."""
+        from . import structure
+
+        return structure(self.task, self.p)
 
     def build(self) -> Dataset:
         """Build the dataset. Deterministic in the spec and fast (0.2 s at p = 181),

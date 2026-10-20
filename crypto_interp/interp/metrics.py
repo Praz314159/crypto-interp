@@ -163,7 +163,7 @@ def order_energy(W_E_values: torch.Tensor, basis: torch.Tensor, ci: CharIndex) -
     ce = char_energy(W_E_values, basis, ci)
     out: dict[int, float] = {}
     for k in ci.freqs:
-        o = order_of(k, ci.p)
+        o = ci.n // math.gcd(k, ci.n)
         out[o] = out.get(o, 0.0) + float(ce[k - 1])
     return out
 

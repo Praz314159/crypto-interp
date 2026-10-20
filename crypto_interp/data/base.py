@@ -5,10 +5,14 @@ returning a `Dataset`. The model and training loop are task-agnostic and use
 the `Dataset` interface uniformly.
 """
 
+from __future__ import annotations
+
 import random
 from dataclasses import dataclass
 
 import torch
+
+from .structure import CyclicStructure
 
 
 @dataclass
@@ -22,6 +26,7 @@ class Dataset:
     vocab_size: int
     n_answer_tokens: int  # how many indices logits[:, -1, :n_answer_tokens] covers
     eq_token: int
+    structure: CyclicStructure | None = None  # the group, for the group tasks
 
     @property
     def n_train(self) -> int:
@@ -42,6 +47,7 @@ def assemble(
     eq_token: int,
     frac_train: float,
     seed: int,
+    structure: CyclicStructure | None = None,
 ) -> Dataset:
     """Common assembly: tokenize [a, b, =], make a random train/test split."""
     n = len(pairs)
@@ -72,4 +78,5 @@ def assemble(
         vocab_size=vocab_size,
         n_answer_tokens=n_answer_tokens,
         eq_token=eq_token,
+        structure=structure,
     )
