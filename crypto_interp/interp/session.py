@@ -8,8 +8,8 @@ measures.
 Two lazy properties are built on first access and reused, so several queries
 against the same forward pass pay for it once: ``cache`` (an
 :class:`ActivationCache` over the full p² grid; ``cache.grid(name,
-units=True)`` gives its units view) and ``logits_grid`` (logits over the (p-1)²
-units grid). See :mod:`crypto_interp.interp.grids` for the two grids.
+group=True)`` gives its view over the task's group) and ``logits_grid`` (logits
+over the n² group grid). See :mod:`crypto_interp.interp.grids` for the two grids.
 
 ::
 
@@ -81,7 +81,7 @@ class Session:
 
     @property
     def logits_grid(self) -> torch.Tensor:
-        """``(p-1, p-1, vocab)`` final-position logits over the units grid (float64)."""
+        """``(n, n, vocab)`` final-position logits over the group grid (float64)."""
         if self._logits_grid is None:
             from .grids import compute_logits_grid
 

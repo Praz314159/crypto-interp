@@ -3,7 +3,7 @@
 import torch
 
 from crypto_interp.data import TaskSpec
-from crypto_interp.interp import Session, to_units, units_mask
+from crypto_interp.interp import Session, group_mask, to_group
 from crypto_interp.interp.metrics import EmbeddingEnergyCallback
 from crypto_interp.measures import energy_support, kernel_noise
 from crypto_interp.runs import checkpoint_paths
@@ -18,12 +18,12 @@ def test_mul_units_is_the_group_without_zero():
     assert ds.n_train == 30 and ds.vocab_size == 12 and ds.n_answer_tokens == 11
 
 
-def test_units_mask_places_examples_by_coordinates():
+def test_group_mask_places_examples_by_coordinates():
     full = TaskSpec("mul", 11, seed=3).build()
-    assert torch.equal(units_mask(full, full.test_mask), to_units(full.test_mask, 11))
+    assert torch.equal(group_mask(full, full.test_mask), to_group(full.test_mask, full.structure))
 
     units = TaskSpec("mul_units", 11, seed=3).build()
-    m = units_mask(units, units.test_mask)
+    m = group_mask(units, units.test_mask)
     assert m.shape == (10, 10) and int(m.sum()) == units.n_test
     for (a, b, _), test in zip(units.inputs.tolist(), units.test_mask.tolist(), strict=True):
         assert bool(m[a - 1, b - 1]) == test

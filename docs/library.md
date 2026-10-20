@@ -71,12 +71,14 @@ are shared between measures.
 
 ```
 
-There are two grids. The full grid covers all p² inputs, 0 included; the
-activation cache uses it, because that is what the model was trained on. The
-units grid covers the (p−1)² inputs with a, b ≠ 0, the domain of the
-characters, which `logits_grid` and most measures use.
-`S.cache.grid(name, units=True)` reshapes a cached activation onto either
-one. `crypto_interp.interp.grids` has the conversions.
+There are two grids. The full grid covers all p² value-token pairs, 0
+included; the activation cache uses it. The group grid covers the n² pairs of
+the task's cyclic group, the domain of the characters, which `logits_grid` and
+most measures use: for multiplication mod p it is the (p−1)² pairs with
+a, b ≠ 0, and for addition mod n it is the whole full grid.
+`S.cache.grid(name)` reshapes a cached activation onto the full grid, and
+`S.cache.grid(name, group=True)` onto the group grid.
+`crypto_interp.interp.grids` has the conversions.
 
 Activation names follow TransformerLens (`blocks.0.mlp.hook_post`), and short
 names work too: `mlp_post`, `mlp_out`, `attn_attn` (the attention pattern),

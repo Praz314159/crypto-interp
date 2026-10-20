@@ -200,7 +200,7 @@ def kernel_noise(S, K: Iterable[int] | None = None) -> KernelNoise:
     ``K`` defaults to the energy support, :func:`.characters.energy_support`.
     """
     from ..interp.bases import discrete_log_table
-    from ..interp.grids import units_mask
+    from ..interp.grids import group_mask
 
     p = S.ds.p
     K = support(S, K)
@@ -215,7 +215,7 @@ def kernel_noise(S, K: Iterable[int] | None = None) -> KernelNoise:
     kappa_K = kernel_from_amplitudes(alpha, p, K={min(k, n - k) for k in K})  # cos is even
     L_emp = empirical_loss(logits, p)
     L_sym = kernel_loss(kappa_obs)
-    held_out = units_mask(S.ds, S.ds.test_mask).numpy()
+    held_out = group_mask(S.ds, S.ds.test_mask).numpy()
     L_emp_test = empirical_loss(logits, p, held_out)
     L_sym_test = kernel_loss(observed_kernel(logits, p, dlog, held_out))
     return KernelNoise(

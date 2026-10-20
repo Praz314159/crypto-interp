@@ -11,8 +11,8 @@ ergonomic accessors:
   multi-block model the bare short name is ambiguous and raises ``KeyError``.
 - ``cache.final(name)`` — the final-position slice ``t[..., -1, :]``.
 - ``cache.grid(name)`` — reshape the ``(p², ...)`` first dim to ``(p, p, ...)``
-  for value-token (a, b) grid analyses; ``units=True`` gives the (p-1, p-1)
-  units view (see :mod:`crypto_interp.interp.grids`).
+  for value-token (a, b) grid analyses; ``group=True`` gives the (n, n) view
+  over the task's cyclic group (see :mod:`crypto_interp.interp.grids`).
 - ``cache.decompose_resid()`` — return the {resid_pre, attn_out, mlp_out}
   triple that sums to the post-block residual (1-block models only).
 
@@ -81,12 +81,13 @@ def resolve_name(names: Iterable[str], key: HookKey) -> str:
 
 
 class ActivationCache:
-    def __init__(self, cache_dict: dict, p: int | None = None):
+    def __init__(self, cache_dict: dict, p: int | None = None, structure=None):
         # detach tensors to drop graphs; pass non-tensors through (e.g., logits, all_inputs)
         self._cache = {
             k: (v.detach() if isinstance(v, torch.Tensor) else v) for k, v in cache_dict.items()
         }
         self._p = p
+        self._structure = structure
 
     # ---------- dict-like interface ----------
     def __getitem__(self, key: HookKey):
@@ -133,19 +134,24 @@ class ActivationCache:
         # patterns it's [..., -1, :]. Both behave the same for our use.
         return t[..., -1, :]
 
-    def grid(self, key: HookKey, p: int | None = None, units: bool = False):
+    def grid(self, key: HookKey, p: int | None = None, group: bool = False):
         """Reshape the full-grid ``(p², ...)`` first dim to ``(p, p, ...)`` over (a, b).
 
-        ``units=True`` returns the (p-1, p-1, ...) units view (a, b != 0), the same
-        grid as :func:`crypto_interp.interp.grids.compute_logits_grid`. Requires p
-        (passed at construction or here).
+        ``group=True`` returns the (n, n, ...) view over the task's cyclic group,
+        the same grid as :func:`crypto_interp.interp.grids.compute_logits_grid`.
+        Requires p (and, for ``group``, the structure), set by
+        :func:`~crypto_interp.interp.activations.cache_all`.
         """
-        from .grids import as_full_grid, to_units
+        from .grids import as_full_grid, to_group
 
+        if group:
+            if self._structure is None:
+                raise ValueError("grid(group=True) needs the task's structure (use cache_all)")
+            return to_group(self[key], self._structure)
         p = p or self._p
         if p is None:
             raise ValueError("grid() requires p (pass at construction via cache_all, or here)")
-        return to_units(self[key], p) if units else as_full_grid(self[key], p)
+        return as_full_grid(self[key], p)
 
     def decompose_resid(self) -> dict[str, torch.Tensor]:
         """Per-component contributions to the residual stream (1-block model).

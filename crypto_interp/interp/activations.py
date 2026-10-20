@@ -48,7 +48,8 @@ def cache_all(model, ds: Dataset) -> ActivationCache:
     - Builds the canonical ``p²`` lexicographic input grid for value tokens.
     - Adds ``logits`` (full), ``logits_final`` (answer-token slice), and
       ``all_inputs`` to the cache.
-    - Sets the cache's ``p`` so ``cache.grid(name)`` works without args.
+    - Sets the cache's ``p`` and structure so ``cache.grid(name)`` and
+      ``cache.grid(name, group=True)`` work without args.
     """
     p = ds.p
     all_inputs = full_grid_inputs(ds).to(next(model.parameters()).device)
@@ -57,6 +58,7 @@ def cache_all(model, ds: Dataset) -> ActivationCache:
     cache._put("logits_final", logits[:, -1, : ds.n_answer_tokens])
     cache._put("all_inputs", all_inputs)
     cache._p = p
+    cache._structure = ds.structure
     return cache
 
 

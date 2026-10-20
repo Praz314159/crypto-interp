@@ -96,10 +96,10 @@ def cluster_signal(model, ds, cluster_neurons, W_U_k: torch.Tensor) -> np.ndarra
     along the direction the unembed reads as χ_k. Comparing this to
     :func:`reference_cos_signal` is the mechanism-verification recipe.
     """
-    from .grids import units_grid_inputs
+    from .grids import group_grid_inputs
 
     p = ds.p
-    inputs = units_grid_inputs(ds)
+    inputs = group_grid_inputs(ds)
     cache: dict[str, torch.Tensor] = {}
     model.remove_all_hooks()
     model.cache_all(cache)
